@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react';
+import { speakBrowser, fetchElevenLabsAudio, getElevenLabsSettings } from '../services/tts.js';
 
 const GRADIENT_PRESETS = {
   professional: ['#1e3a5f', '#0d2137'],
@@ -17,11 +18,7 @@ function hexToRgb(hex) {
   return { r, g, b };
 }
 
-function lerp(a, b, t) {
-  return a + (b - a) * t;
-}
-
-export default function VideoPreview({ script, currentScene, onSceneChange }) {
+export default function VideoPreview({ script, currentScene, onSceneChange, voiceLang = 'en-US' }) {
   const canvasRef = useRef(null);
   const animFrameRef = useRef(null);
   const synthRef = useRef(null);
@@ -50,21 +47,30 @@ export default function VideoPreview({ script, currentScene, onSceneChange }) {
     setIsSpeaking(false);
   }, []);
 
-  const speakNarration = useCallback((text) => {
-    if (!window.speechSynthesis || isMuted) return;
+  const speakNarration = useCallback(async (text) => {
+    if (isMuted) return;
     stopSpeech();
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.rate = 0.9;
-    utt.pitch = 1;
-    utt.volume = 0.9;
-    const voices = window.speechSynthesis.getVoices();
-    const preferred = voices.find(v => v.name.includes('Google') || v.lang === 'en-US');
-    if (preferred) utt.voice = preferred;
-    utt.onstart = () => setIsSpeaking(true);
-    utt.onend = () => setIsSpeaking(false);
-    synthRef.current = utt;
-    window.speechSynthesis.speak(utt);
-  }, [isMuted, stopSpeech]);
+    const { apiKey: elKey, voiceId } = getElevenLabsSettings();
+
+    // Try ElevenLabs realistic voice first
+    if (elKey) {
+      try {
+        const blob = await fetchElevenLabsAudio(text, elKey, voiceId);
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.onplay  = () => setIsSpeaking(true);
+        audio.onended = () => { setIsSpeaking(false); URL.revokeObjectURL(url); };
+        audio.play();
+        return;
+      } catch (e) {
+        console.warn('ElevenLabs failed, falling back to browser TTS', e.message);
+      }
+    }
+
+    // Fallback: browser SpeechSynthesis with correct language
+    setIsSpeaking(true);
+    await speakBrowser(text, voiceLang, () => setIsSpeaking(false));
+  }, [isMuted, stopSpeech, voiceLang]);
 
   // Draw canvas
   useEffect(() => {

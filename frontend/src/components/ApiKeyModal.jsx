@@ -1,16 +1,21 @@
 import { useState } from 'react';
-import { X, Key, Eye, EyeOff, ExternalLink, Shield, Check, ChevronDown } from 'lucide-react';
+import { X, Key, Eye, EyeOff, ExternalLink, Shield, Check, ChevronDown, Mic } from 'lucide-react';
 import { PROVIDER_LIST, PROVIDERS, getSettings, saveSettings } from '../services/providers.js';
+import { getElevenLabsSettings, saveElevenLabsSettings, ELEVENLABS_VOICES } from '../services/tts.js';
 
 export default function ApiKeyModal({ onClose }) {
   const current = getSettings();
+  const elSettings = getElevenLabsSettings();
+
   const [selectedProvider, setSelectedProvider] = useState(current.providerId || 'groq');
   const [selectedModel, setSelectedModel] = useState(current.modelId || PROVIDERS.groq.defaultModel);
-  const [apiKey, setApiKey] = useState(
-    localStorage.getItem(`ai_key_${current.providerId || 'groq'}`) || ''
-  );
+  const [apiKey, setApiKey] = useState(localStorage.getItem(`ai_key_${current.providerId || 'groq'}`) || '');
   const [show, setShow] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [activeTab, setActiveTab] = useState('ai'); // 'ai' | 'voice'
+  const [elKey, setElKey] = useState(elSettings.apiKey);
+  const [elVoice, setElVoice] = useState(elSettings.voiceId);
+  const [showEl, setShowEl] = useState(false);
 
   const provider = PROVIDERS[selectedProvider];
 
@@ -23,6 +28,7 @@ export default function ApiKeyModal({ onClose }) {
 
   const handleSave = () => {
     saveSettings({ providerId: selectedProvider, modelId: selectedModel, apiKey: apiKey.trim() });
+    saveElevenLabsSettings(elKey.trim(), elVoice);
     setSaved(true);
     setTimeout(() => { setSaved(false); onClose(); }, 700);
   };
@@ -33,16 +39,80 @@ export default function ApiKeyModal({ onClose }) {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h3 className="text-xl font-bold">AI Provider Settings</h3>
-            <p className="text-sm text-white/40 mt-0.5">Choose your AI and add an API key</p>
+            <h3 className="text-xl font-bold">Settings</h3>
+            <p className="text-sm text-white/40 mt-0.5">AI Provider & Voice</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg glass glass-hover flex items-center justify-center">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Provider Grid */}
-        <div className="mb-5">
+        {/* Tabs */}
+        <div className="flex gap-1 glass rounded-xl p-1 mb-5">
+          <button onClick={() => setActiveTab('ai')}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${
+              activeTab === 'ai' ? 'bg-brand-500/30 text-white' : 'text-white/50 hover:text-white'
+            }`}>
+            <Key className="w-4 h-4" /> AI Provider
+          </button>
+          <button onClick={() => setActiveTab('voice')}
+            className={`flex-1 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${
+              activeTab === 'voice' ? 'bg-brand-500/30 text-white' : 'text-white/50 hover:text-white'
+            }`}>
+            <Mic className="w-4 h-4" /> Realistic Voice
+            {elKey && <span className="w-2 h-2 rounded-full bg-green-400" />}
+          </button>
+        </div>
+
+        {activeTab === 'voice' && (
+          <div className="space-y-4 mb-4">
+            <div className="flex gap-3 p-3 bg-green-500/10 border border-green-500/20 rounded-xl">
+              <Mic className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-white/70 leading-relaxed">
+                <strong className="text-white">ElevenLabs</strong> gives you realistic human-like voices in
+                Hindi, Punjabi, English, Spanish and 25+ more languages.{' '}
+                <span className="text-green-400">Free tier: 10,000 chars/month.</span>
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm text-white/50">ElevenLabs API Key</label>
+                <a href="https://elevenlabs.io" target="_blank" rel="noopener noreferrer"
+                  className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">
+                  Get free key <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+              <div className="relative">
+                <input type={showEl ? 'text' : 'password'} value={elKey} onChange={e => setElKey(e.target.value)}
+                  placeholder="sk_..." className="input-field pr-10 font-mono text-sm" />
+                <button type="button" onClick={() => setShowEl(s => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white">
+                  {showEl ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm text-white/50 mb-2 block">Voice Character</label>
+              <div className="grid grid-cols-2 gap-2">
+                {ELEVENLABS_VOICES.map(v => (
+                  <button key={v.id} onClick={() => setElVoice(v.id)}
+                    className={`py-2.5 px-3 rounded-xl text-left text-sm transition-all border ${
+                      elVoice === v.id ? 'bg-brand-500/20 border-brand-500/50' : 'glass border-white/10 hover:border-white/20'
+                    }`}>
+                    <p className="font-medium text-white">{v.name}</p>
+                    <p className="text-xs text-white/40">{v.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="text-xs text-white/30 leading-relaxed">
+              Without ElevenLabs, browser voices are used (quality depends on your device). iOS has Hindi voice "Lekha".
+            </p>
+          </div>
+        )}
+
+        {/* Provider Grid — only shown on AI tab */}
+        {activeTab === 'ai' && <div className="mb-5">
           <label className="text-sm text-white/50 mb-3 block font-medium">Choose AI Provider</label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {PROVIDER_LIST.map(p => (
@@ -147,7 +217,7 @@ export default function ApiKeyModal({ onClose }) {
         )}
 
         {/* Quick guide for free providers */}
-        {(selectedProvider === 'groq' || selectedProvider === 'gemini' || selectedProvider === 'openrouter') && (
+        {activeTab === 'ai' && (selectedProvider === 'groq' || selectedProvider === 'gemini' || selectedProvider === 'openrouter') && (
           <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded-xl">
             <p className="text-xs font-semibold text-green-400 mb-1">
               {selectedProvider === 'groq' && '⚡ Groq is completely FREE — just sign up and create a key!'}

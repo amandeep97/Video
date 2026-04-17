@@ -1,101 +1,128 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, memo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Sparkles, RefreshCw, Download, Copy, Check,
   Settings2, ChevronDown, ChevronUp, Wand2, FileText,
-  Palette, Clock, Users, Mic, AlertCircle, Video, Key,
-  Play, Layers
+  Palette, Clock, Users, Mic, AlertCircle, Video, Key, Play, Layers
 } from 'lucide-react';
 import { generateScript, regenerateScene } from '../services/api.js';
 import { hasValidKey, getSettings, PROVIDERS } from '../services/providers.js';
+import { VOICE_LANGUAGES, getElevenLabsSettings, saveVoiceLang } from '../services/tts.js';
 import VideoPreview from '../components/VideoPreview.jsx';
 import SceneCard from '../components/SceneCard.jsx';
 import SceneEditor from '../components/SceneEditor.jsx';
 import ApiKeyModal from '../components/ApiKeyModal.jsx';
+import VideoExporter from '../components/VideoExporter.jsx';
+
+// ── Stable components defined OUTSIDE Creator to prevent remount on re-render ──
+
+const TopicInput = memo(({ value, onChange }) => (
+  <div>
+    <label className="text-sm text-white/50 mb-2 block font-medium">Video Topic</label>
+    <textarea
+      value={value}
+      onChange={onChange}
+      placeholder="e.g. How to build a successful startup in 2025..."
+      className="input-field resize-none h-24 text-sm"
+    />
+  </div>
+));
+TopicInput.displayName = 'TopicInput';
+
+const FeedbackInput = memo(({ value, onChange, onSubmit, onCancel }) => (
+  <div className="mt-1 flex gap-2 px-1">
+    <input
+      type="text" value={value} onChange={onChange} autoFocus
+      onKeyDown={e => { if (e.key === 'Enter') onSubmit(); if (e.key === 'Escape') onCancel(); }}
+      placeholder="Feedback for AI... (Enter to regenerate)"
+      className="input-field text-xs py-2 flex-1"
+    />
+    <button onClick={onSubmit} className="btn-primary text-xs py-2 px-3">Go</button>
+  </div>
+));
+FeedbackInput.displayName = 'FeedbackInput';
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 const STYLES = [
   { id: 'professional', label: 'Professional', emoji: '💼' },
-  { id: 'cinematic', label: 'Cinematic', emoji: '🎬' },
-  { id: 'educational', label: 'Educational', emoji: '📚' },
-  { id: 'social', label: 'Social Media', emoji: '📱' },
-  { id: 'motivational', label: 'Motivational', emoji: '🔥' },
-  { id: 'documentary', label: 'Documentary', emoji: '🎥' },
+  { id: 'cinematic',    label: 'Cinematic',     emoji: '🎬' },
+  { id: 'educational',  label: 'Educational',   emoji: '📚' },
+  { id: 'social',       label: 'Social Media',  emoji: '📱' },
+  { id: 'motivational', label: 'Motivational',  emoji: '🔥' },
+  { id: 'documentary',  label: 'Documentary',   emoji: '🎥' },
 ];
 
-const TONES = ['engaging', 'professional', 'casual', 'inspirational', 'educational', 'humorous'];
+const TONES     = ['engaging', 'professional', 'casual', 'inspirational', 'educational', 'humorous'];
 const AUDIENCES = ['general', 'beginners', 'professionals', 'students', 'entrepreneurs', 'seniors'];
-const LANGUAGES = ['English', 'Spanish', 'French', 'German', 'Hindi', 'Portuguese', 'Japanese', 'Chinese'];
+const SCRIPT_LANGS = ['English', 'Hindi', 'Punjabi', 'Spanish', 'French', 'German', 'Portuguese', 'Japanese'];
 
 const MOBILE_TABS = [
   { id: 'configure', label: 'Configure', icon: Settings2 },
-  { id: 'preview', label: 'Preview', icon: Play },
-  { id: 'scenes', label: 'Scenes', icon: Layers },
+  { id: 'preview',   label: 'Preview',   icon: Play },
+  { id: 'scenes',    label: 'Scenes',    icon: Layers },
 ];
 
 export default function Creator() {
-  const navigate = useNavigate();
+  const navigate    = useNavigate();
   const [searchParams] = useSearchParams();
 
   // Form state
-  const [topic, setTopic] = useState(searchParams.get('topic') || '');
-  const [style, setStyle] = useState(searchParams.get('style') || 'professional');
+  const [topic,    setTopic]    = useState(searchParams.get('topic') || '');
+  const [style,    setStyle]    = useState(searchParams.get('style') || 'professional');
   const [duration, setDuration] = useState(Number(searchParams.get('duration')) || 60);
-  const [tone, setTone] = useState('engaging');
+  const [tone,     setTone]     = useState('engaging');
   const [audience, setAudience] = useState('general');
-  const [language, setLanguage] = useState('English');
+  const [scriptLang, setScriptLang] = useState('English');
+  const [voiceLang,  setVoiceLang]  = useState(getElevenLabsSettings().langCode || 'en-US');
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Output state
-  const [script, setScript] = useState(null);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState('');
-  const [currentScene, setCurrentScene] = useState(0);
-  const [regeneratingScene, setRegeneratingScene] = useState(null);
-  const [editingScene, setEditingScene] = useState(null);
-  const [copied, setCopied] = useState(false);
+  const [script,             setScript]             = useState(null);
+  const [isGenerating,       setIsGenerating]       = useState(false);
+  const [error,              setError]              = useState('');
+  const [currentScene,       setCurrentScene]       = useState(0);
+  const [regeneratingScene,  setRegeneratingScene]  = useState(null);
+  const [editingScene,       setEditingScene]       = useState(null);
+  const [feedbackForScene,   setFeedbackForScene]   = useState(null);
   const [regenerateFeedback, setRegenerateFeedback] = useState('');
-  const [feedbackForScene, setFeedbackForScene] = useState(null);
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [hasApiKey, setHasApiKey] = useState(hasValidKey());
-  const [mobileTab, setMobileTab] = useState('configure');
+  const [copied,             setCopied]             = useState(false);
+  const [mobileTab,          setMobileTab]          = useState('configure');
+
+  // Modal state
+  const [showApiKeyModal,    setShowApiKeyModal]    = useState(false);
+  const [showExporter,       setShowExporter]       = useState(false);
+  const [hasApiKey,          setHasApiKey]          = useState(hasValidKey());
 
   const refreshKeyState = () => setHasApiKey(hasValidKey());
 
-  const currentProviderName = () => {
-    const { providerId } = getSettings();
-    return PROVIDERS[providerId]?.name || 'AI';
-  };
+  const currentProviderName = () => PROVIDERS[getSettings().providerId]?.name || 'AI';
 
   useEffect(() => {
-    if (searchParams.get('topic') && hasValidKey()) {
-      handleGenerate();
-    } else if (searchParams.get('topic') && !hasValidKey()) {
-      setShowApiKeyModal(true);
-    }
+    if (searchParams.get('topic') && hasValidKey()) handleGenerate();
+    else if (searchParams.get('topic') && !hasValidKey()) setShowApiKeyModal(true);
   }, []);
 
   const handleGenerate = useCallback(async () => {
-    if (!topic.trim()) { setError('Please enter a topic'); return; }
-    if (!hasValidKey()) { setShowApiKeyModal(true); return; }
+    if (!topic.trim())   { setError('Please enter a topic'); return; }
+    if (!hasValidKey())  { setShowApiKeyModal(true); return; }
     setIsGenerating(true);
     setError('');
     setScript(null);
     setCurrentScene(0);
     setMobileTab('preview');
     try {
-      const result = await generateScript({ topic, style, duration, tone, audience, language });
+      const result = await generateScript({ topic, style, duration, tone, audience, language: scriptLang });
       setScript(result);
-      setMobileTab('preview');
     } catch (err) {
       setError(err.message || 'Failed to generate. Check your API key in Settings.');
       setMobileTab('configure');
     } finally {
       setIsGenerating(false);
     }
-  }, [topic, style, duration, tone, audience, language]);
+  }, [topic, style, duration, tone, audience, scriptLang]);
 
   const handleRegenerateScene = async (index, feedback = '') => {
-    if (!script) return;
     setRegeneratingScene(index);
     try {
       const updated = await regenerateScene(script.scenes[index], topic, style, feedback);
@@ -103,65 +130,45 @@ export default function Creator() {
         ...prev,
         scenes: prev.scenes.map((s, i) => i === index ? { ...updated, id: s.id } : s),
       }));
-    } catch (err) {
-      setError(err.message);
-    } finally {
+    } catch (err) { setError(err.message); }
+    finally {
       setRegeneratingScene(null);
       setFeedbackForScene(null);
       setRegenerateFeedback('');
     }
   };
 
-  const handleSaveScene = (updatedScene) => {
+  const handleSaveScene = (updated) => {
     if (!script || editingScene === null) return;
-    setScript(prev => ({
-      ...prev,
-      scenes: prev.scenes.map((s, i) => i === editingScene ? updatedScene : s),
-    }));
+    setScript(prev => ({ ...prev, scenes: prev.scenes.map((s, i) => i === editingScene ? updated : s) }));
   };
 
   const handleCopyScript = () => {
     if (!script) return;
     const text = [
-      `# ${script.title}`,
-      `\n${script.description}`,
-      `\nDuration: ${script.totalDuration}s | Style: ${script.style}`,
-      `\n${'='.repeat(50)}`,
-      ...script.scenes.map(s => [
-        `\n## Scene ${s.id}: ${s.title} (${s.duration}s)`,
-        `\n**Narration:** ${s.narration}`,
-        s.keyPoints?.length ? `\n**Key Points:**\n${s.keyPoints.map(p => `- ${p}`).join('\n')}` : '',
-        `\n**Visual:** ${s.visualDescription}`,
-      ].filter(Boolean).join('\n')),
-      `\n${'='.repeat(50)}`,
-      `\n**Call to Action:** ${script.callToAction}`,
+      `# ${script.title}\n${script.description}`,
+      `Duration: ${script.totalDuration}s | Style: ${script.style}`,
+      '='.repeat(50),
+      ...script.scenes.map(s =>
+        `\n## Scene ${s.id}: ${s.title} (${s.duration}s)\n**Narration:** ${s.narration}` +
+        (s.keyPoints?.length ? `\n**Key Points:**\n${s.keyPoints.map(p => `- ${p}`).join('\n')}` : '') +
+        `\n**Visual:** ${s.visualDescription}`
+      ),
+      `\n**CTA:** ${script.callToAction}`,
     ].join('\n');
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleExport = () => {
-    if (!script) return;
-    const blob = new Blob([JSON.stringify(script, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${script.title.replace(/\s+/g, '-').toLowerCase()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  const totalDuration = script?.scenes?.reduce((s, sc) => s + (sc.duration || 0), 0) || 0;
 
-  const totalDuration = script?.scenes?.reduce((sum, s) => sum + (s.duration || 0), 0) || 0;
-
-  // ── Panels as JSX variables (NOT inner components — avoids remount on every keystroke) ──
+  // ── Configure panel JSX (uses TopicInput memo component for stable textarea) ──
   const configurePanel = (
     <div className="space-y-5 pb-4">
       {!hasApiKey && (
-        <button
-          onClick={() => setShowApiKeyModal(true)}
-          className="w-full flex items-center gap-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl hover:bg-yellow-500/15 transition-colors text-left"
-        >
+        <button onClick={() => setShowApiKeyModal(true)}
+          className="w-full flex items-center gap-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl hover:bg-yellow-500/15 transition-colors text-left">
           <Key className="w-4 h-4 text-yellow-400 flex-shrink-0" />
           <div>
             <p className="text-sm font-medium text-yellow-300">API Key Required</p>
@@ -170,29 +177,20 @@ export default function Creator() {
         </button>
       )}
 
-      <div>
-        <label className="text-sm text-white/50 mb-2 block font-medium">Video Topic</label>
-        <textarea
-          value={topic}
-          onChange={e => setTopic(e.target.value)}
-          placeholder="e.g. How to build a successful startup..."
-          className="input-field resize-none h-24 text-sm"
-        />
-      </div>
+      {/* Stable memo component — won't remount on re-render */}
+      <TopicInput value={topic} onChange={e => setTopic(e.target.value)} />
 
+      {/* Style */}
       <div>
         <label className="text-sm text-white/50 mb-2 block font-medium">Style</label>
         <div className="grid grid-cols-2 gap-2">
           {STYLES.map(s => (
-            <button
-              key={s.id}
-              onClick={() => setStyle(s.id)}
+            <button key={s.id} onClick={() => setStyle(s.id)}
               className={`py-3 px-3 rounded-xl text-sm font-medium flex items-center gap-2 transition-all ${
                 style === s.id
                   ? 'bg-brand-500/25 border border-brand-500/60 text-white'
                   : 'glass glass-hover text-white/60 border border-transparent'
-              }`}
-            >
+              }`}>
               <span className="text-lg">{s.emoji}</span>
               <span>{s.label}</span>
             </button>
@@ -200,18 +198,48 @@ export default function Creator() {
         </div>
       </div>
 
+      {/* Duration */}
       <div>
         <label className="text-sm text-white/50 mb-2 block font-medium flex items-center gap-2">
           <Clock className="w-4 h-4" />
           Duration: <span className="text-white">{duration}s ({Math.floor(duration / 60)}:{String(duration % 60).padStart(2, '0')})</span>
         </label>
         <input type="range" min={30} max={180} step={15} value={duration}
-          onChange={e => setDuration(Number(e.target.value))} className="w-full accent-brand-500 h-2" />
+          onChange={e => setDuration(Number(e.target.value))}
+          className="w-full accent-brand-500 h-2" />
         <div className="flex justify-between text-xs text-white/30 mt-1">
           <span>30s</span><span>1min</span><span>2min</span><span>3min</span>
         </div>
       </div>
 
+      {/* Voice language */}
+      <div>
+        <label className="text-sm text-white/50 mb-2 block font-medium flex items-center gap-2">
+          <Mic className="w-4 h-4" /> Voice Language
+        </label>
+        <div className="grid grid-cols-3 gap-1.5">
+          {VOICE_LANGUAGES.map(l => (
+            <button key={l.id} onClick={() => { setVoiceLang(l.id); saveVoiceLang(l.id); }}
+              className={`py-2 px-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all ${
+                voiceLang === l.id
+                  ? 'bg-brand-500/25 border border-brand-500/50 text-white'
+                  : 'glass text-white/50 hover:text-white border border-transparent'
+              }`}>
+              <span>{l.flag}</span>
+              <span className="truncate">{l.label}</span>
+            </button>
+          ))}
+        </div>
+        {!getElevenLabsSettings().apiKey && (
+          <p className="text-xs text-white/30 mt-2 flex items-center gap-1">
+            <span>Add ElevenLabs key in</span>
+            <button onClick={() => setShowApiKeyModal(true)} className="text-brand-400 underline">Settings</button>
+            <span>for realistic voices</span>
+          </p>
+        )}
+      </div>
+
+      {/* Advanced */}
       <div>
         <button onClick={() => setShowAdvanced(a => !a)}
           className="flex items-center gap-2 text-sm text-white/50 hover:text-white/80 transition-colors py-1">
@@ -219,13 +247,10 @@ export default function Creator() {
           Advanced Options
           {showAdvanced ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
-
         {showAdvanced && (
           <div className="mt-3 space-y-4 pl-1">
             <div>
-              <label className="text-xs text-white/40 mb-2 flex items-center gap-1.5 uppercase tracking-wider">
-                <Mic className="w-3 h-3" /> Tone
-              </label>
+              <label className="text-xs text-white/40 mb-2 flex items-center gap-1.5 uppercase tracking-wider">Tone</label>
               <div className="flex flex-wrap gap-1.5">
                 {TONES.map(t => (
                   <button key={t} onClick={() => setTone(t)}
@@ -250,10 +275,10 @@ export default function Creator() {
             </div>
             <div>
               <label className="text-xs text-white/40 mb-2 flex items-center gap-1.5 uppercase tracking-wider">
-                <Palette className="w-3 h-3" /> Language
+                <Palette className="w-3 h-3" /> Script Language
               </label>
-              <select value={language} onChange={e => setLanguage(e.target.value)} className="input-field text-sm py-2">
-                {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+              <select value={scriptLang} onChange={e => setScriptLang(e.target.value)} className="input-field text-sm py-2">
+                {SCRIPT_LANGS.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
           </div>
@@ -293,17 +318,26 @@ export default function Creator() {
           : <><Sparkles className="w-5 h-5" /><span>{script ? 'Regenerate' : 'Generate'} Video</span></>
         }
       </button>
+
+      {script && (
+        <button onClick={() => setShowExporter(true)}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-brand-500/30 text-brand-400 hover:bg-brand-500/10 transition-all text-sm font-medium">
+          <Video className="w-4 h-4" />
+          Export as Video File (.webm)
+        </button>
+      )}
     </div>
   );
 
+  // ── Preview panel ─────────────────────────────────────────────────────────
   const previewPanel = (
     <div className="space-y-4">
-      <VideoPreview script={script} currentScene={currentScene} onSceneChange={setCurrentScene} />
+      <VideoPreview script={script} currentScene={currentScene} onSceneChange={setCurrentScene} voiceLang={voiceLang} />
       {isGenerating && (
         <div className="glass rounded-xl p-5 text-center">
           <div className="animate-pulse space-y-3 mb-3">
             <div className="h-4 bg-white/10 rounded-full w-3/4 mx-auto" />
-            <div className="h-3 bg-white/5 rounded-full w-full" />
+            <div className="h-3 bg-white/5 rounded-full" />
             <div className="h-3 bg-white/5 rounded-full w-5/6 mx-auto" />
           </div>
           <p className="text-xs text-white/30">AI is writing your video script...</p>
@@ -328,9 +362,17 @@ export default function Creator() {
           </div>
         </div>
       )}
+      {script && (
+        <button onClick={() => setShowExporter(true)}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-brand-500/30 text-brand-400 hover:bg-brand-500/10 transition-all text-sm font-medium">
+          <Video className="w-4 h-4" />
+          Export as Video File
+        </button>
+      )}
     </div>
   );
 
+  // ── Scenes panel ──────────────────────────────────────────────────────────
   const scenesPanel = (
     <div>
       <div className="flex items-center justify-between mb-4">
@@ -341,7 +383,7 @@ export default function Creator() {
       {!script && !isGenerating && (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="text-5xl mb-4">🎬</div>
-          <p className="text-white/30 text-sm">Generate a video to see scenes here</p>
+          <p className="text-white/30 text-sm">Generate a video to see scenes</p>
         </div>
       )}
 
@@ -350,7 +392,7 @@ export default function Creator() {
           {[...Array(4)].map((_, i) => (
             <div key={i} className="glass rounded-xl p-4 animate-pulse">
               <div className="flex gap-3">
-                <div className="w-8 h-8 bg-white/10 rounded-lg" />
+                <div className="w-8 h-8 bg-white/10 rounded-lg flex-shrink-0" />
                 <div className="flex-1 space-y-2">
                   <div className="h-3 bg-white/10 rounded-full w-3/4" />
                   <div className="h-2.5 bg-white/5 rounded-full" />
@@ -383,19 +425,12 @@ export default function Creator() {
                 }}
               />
               {feedbackForScene === index && (
-                <div className="mt-1 flex gap-2 px-1">
-                  <input type="text" value={regenerateFeedback}
-                    onChange={e => setRegenerateFeedback(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') handleRegenerateScene(index, regenerateFeedback);
-                      if (e.key === 'Escape') setFeedbackForScene(null);
-                    }}
-                    placeholder="Feedback for AI... (Enter to regenerate)"
-                    className="input-field text-xs py-2 flex-1" autoFocus
-                  />
-                  <button onClick={() => handleRegenerateScene(index, regenerateFeedback)}
-                    className="btn-primary text-xs py-2 px-3">Go</button>
-                </div>
+                <FeedbackInput
+                  value={regenerateFeedback}
+                  onChange={e => setRegenerateFeedback(e.target.value)}
+                  onSubmit={() => handleRegenerateScene(index, regenerateFeedback)}
+                  onCancel={() => setFeedbackForScene(null)}
+                />
               )}
             </div>
           ))}
@@ -409,8 +444,7 @@ export default function Creator() {
       {/* Header */}
       <header className="glass border-b border-white/10 px-4 py-3 flex items-center justify-between sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/')}
-            className="w-9 h-9 rounded-xl glass glass-hover flex items-center justify-center">
+          <button onClick={() => navigate('/')} className="w-9 h-9 rounded-xl glass glass-hover flex items-center justify-center">
             <ArrowLeft className="w-4 h-4" />
           </button>
           <div className="flex items-center gap-2">
@@ -419,22 +453,16 @@ export default function Creator() {
             </div>
             <span className="font-bold gradient-text">VideoAI</span>
           </div>
-          {script && (
-            <span className="hidden sm:block text-white/40 text-xs truncate max-w-[140px]">{script.title}</span>
-          )}
+          {script && <span className="hidden sm:block text-white/40 text-xs truncate max-w-[140px]">{script.title}</span>}
         </div>
 
         <div className="flex items-center gap-2">
           {script && (
             <>
-              <button onClick={handleCopyScript}
-                className="w-9 h-9 rounded-xl glass glass-hover flex items-center justify-center"
-                title="Copy script">
+              <button onClick={handleCopyScript} className="w-9 h-9 rounded-xl glass glass-hover flex items-center justify-center" title="Copy script">
                 {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
               </button>
-              <button onClick={handleExport}
-                className="w-9 h-9 rounded-xl glass glass-hover flex items-center justify-center"
-                title="Export JSON">
+              <button onClick={() => setShowExporter(true)} className="w-9 h-9 rounded-xl glass glass-hover flex items-center justify-center" title="Export Video">
                 <Download className="w-4 h-4" />
               </button>
             </>
@@ -447,13 +475,11 @@ export default function Creator() {
         </div>
       </header>
 
-      {/* ── DESKTOP layout (lg+) ─────────────────────────────────────── */}
+      {/* Desktop layout */}
       <div className="hidden lg:flex flex-1 overflow-hidden">
-        {/* Left panel */}
         <aside className="w-80 xl:w-96 flex-shrink-0 border-r border-white/5 overflow-y-auto p-5">
           {configurePanel}
         </aside>
-        {/* Preview */}
         <div className="flex-1 border-r border-white/5 overflow-y-auto p-5">
           <div className="sticky top-5">
             <div className="flex items-center justify-between mb-4">
@@ -468,27 +494,26 @@ export default function Creator() {
             {previewPanel}
           </div>
         </div>
-        {/* Scenes */}
         <div className="w-80 xl:w-96 flex-shrink-0 overflow-y-auto p-5">
           {scenesPanel}
         </div>
       </div>
 
-      {/* ── MOBILE layout (< lg) ─────────────────────────────────────── */}
+      {/* Mobile layout */}
       <div className="lg:hidden flex-1 overflow-y-auto">
         <div className="p-4 pb-24">
           {mobileTab === 'configure' && configurePanel}
-          {mobileTab === 'preview' && previewPanel}
-          {mobileTab === 'scenes' && scenesPanel}
+          {mobileTab === 'preview'   && previewPanel}
+          {mobileTab === 'scenes'    && scenesPanel}
         </div>
       </div>
 
-      {/* ── MOBILE bottom tab bar ────────────────────────────────────── */}
+      {/* Mobile tab bar */}
       <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 glass border-t border-white/10 px-2 py-2 safe-bottom">
         <div className="flex">
           {MOBILE_TABS.map(({ id, label, icon: Icon }) => {
-            const isActive = mobileTab === id;
-            const hasNotif = id === 'preview' && isGenerating;
+            const isActive  = mobileTab === id;
+            const hasNotif  = id === 'preview' && isGenerating;
             return (
               <button key={id} onClick={() => setMobileTab(id)}
                 className={`flex-1 flex flex-col items-center gap-1 py-2 px-1 rounded-xl transition-all relative ${
@@ -496,9 +521,7 @@ export default function Creator() {
                 }`}>
                 <Icon className="w-5 h-5" />
                 <span className="text-xs font-medium">{label}</span>
-                {hasNotif && (
-                  <span className="absolute top-1.5 right-3 w-2 h-2 rounded-full bg-brand-400 animate-pulse" />
-                )}
+                {hasNotif && <span className="absolute top-1.5 right-3 w-2 h-2 rounded-full bg-brand-400 animate-pulse" />}
                 {id === 'scenes' && script?.scenes?.length > 0 && (
                   <span className="absolute top-1.5 right-3 min-w-[16px] h-4 px-1 rounded-full bg-brand-500/60 text-white text-[10px] flex items-center justify-center">
                     {script.scenes.length}
@@ -516,6 +539,9 @@ export default function Creator() {
       )}
       {showApiKeyModal && (
         <ApiKeyModal onClose={() => { setShowApiKeyModal(false); refreshKeyState(); }} />
+      )}
+      {showExporter && script && (
+        <VideoExporter script={script} onClose={() => setShowExporter(false)} />
       )}
     </div>
   );
