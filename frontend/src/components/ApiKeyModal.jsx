@@ -4,6 +4,7 @@ import { PROVIDER_LIST, PROVIDERS, getSettings, saveSettings } from '../services
 import { getElevenLabsSettings, saveElevenLabsSettings, ELEVENLABS_VOICES } from '../services/tts.js';
 import { getPexelsKey, savePexelsKey } from '../services/pexels.js';
 import { getJamendoKey, saveJamendoKey } from '../services/jamendo.js';
+import { getFreesoundKey, saveFreesoundKey } from '../services/freesound.js';
 
 export default function ApiKeyModal({ onClose }) {
   const current    = getSettings();
@@ -20,8 +21,10 @@ export default function ApiKeyModal({ onClose }) {
   const [showEl,      setShowEl]     = useState(false);
   const [pexelsKey,   setPexelsKey]  = useState(getPexelsKey());
   const [showPx,      setShowPx]     = useState(false);
-  const [jamendoKey,  setJamendoKey] = useState(getJamendoKey());
-  const [showJm,      setShowJm]     = useState(false);
+  const [jamendoKey,    setJamendoKey]    = useState(getJamendoKey());
+  const [showJm,        setShowJm]        = useState(false);
+  const [freesoundKey,  setFreesoundKey]  = useState(getFreesoundKey());
+  const [showFs,        setShowFs]        = useState(false);
 
   const provider = PROVIDERS[selectedProvider];
 
@@ -37,6 +40,7 @@ export default function ApiKeyModal({ onClose }) {
     saveElevenLabsSettings(elKey.trim(), elVoice);
     savePexelsKey(pexelsKey);
     saveJamendoKey(jamendoKey);
+    saveFreesoundKey(freesoundKey);
     setSaved(true);
     setTimeout(() => { setSaved(false); onClose(); }, 700);
   };
@@ -180,41 +184,74 @@ export default function ApiKeyModal({ onClose }) {
 
         {/* ── Music tab ───────────────────────────────── */}
         {activeTab === 'music' && (
-          <div className="space-y-4 mb-4">
-            <div className="flex gap-3 p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl">
-              <Music className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-white/70 leading-relaxed">
-                <strong className="text-white">Jamendo</strong> gives you a library of 600,000+ royalty-free tracks to browse by mood — like Instagram's music picker.{' '}
-                <span className="text-purple-400">Free to register, free to use.</span>
+          <div className="space-y-5 mb-4">
+            {/* Freesound — for Indian music */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🥁</span>
+                <div>
+                  <p className="text-sm font-semibold text-white">Freesound <span className="text-xs text-purple-400 font-normal">— Punjabi · Bollywood · Indian</span></p>
+                  <p className="text-xs text-white/40">Largest library of bhangra, dhol, Bollywood music. Free account.</p>
+                </div>
+                {freesoundKey && <span className="ml-auto w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />}
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-white/50">Freesound API Key</label>
+                  <a href="https://freesound.org/apiv2" target="_blank" rel="noopener noreferrer"
+                    className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">
+                    Get free key <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+                <div className="relative">
+                  <input type={showFs ? 'text' : 'password'} value={freesoundKey}
+                    onChange={e => setFreesoundKey(e.target.value)}
+                    placeholder="Paste your Freesound API key…" className="input-field pr-10 font-mono text-sm" />
+                  <button type="button" onClick={() => setShowFs(s => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white">
+                    {showFs ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-white/30 mt-1">freesound.org → Sign up → Profile → API keys → Create</p>
               </div>
             </div>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm text-white/50">Jamendo Client ID</label>
-                <a href="https://devportal.jamendo.com" target="_blank" rel="noopener noreferrer"
-                  className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">
-                  Get free key <ExternalLink className="w-3 h-3" />
-                </a>
+
+            <div className="border-t border-white/10" />
+
+            {/* Jamendo — for Western music */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🎵</span>
+                <div>
+                  <p className="text-sm font-semibold text-white">Jamendo <span className="text-xs text-brand-400 font-normal">— Hip-Hop · Calm · Cinematic · Energetic</span></p>
+                  <p className="text-xs text-white/40">600,000+ Western royalty-free tracks. Free account.</p>
+                </div>
+                {jamendoKey && <span className="ml-auto w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />}
               </div>
-              <div className="relative">
-                <input type={showJm ? 'text' : 'password'} value={jamendoKey}
-                  onChange={e => setJamendoKey(e.target.value)}
-                  placeholder="Paste your Jamendo Client ID…" className="input-field pr-10 font-mono text-sm" />
-                <button type="button" onClick={() => setShowJm(s => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white">
-                  {showJm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-white/50">Jamendo Client ID</label>
+                  <a href="https://devportal.jamendo.com" target="_blank" rel="noopener noreferrer"
+                    className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">
+                    Get free key <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+                <div className="relative">
+                  <input type={showJm ? 'text' : 'password'} value={jamendoKey}
+                    onChange={e => setJamendoKey(e.target.value)}
+                    placeholder="Paste your Jamendo Client ID…" className="input-field pr-10 font-mono text-sm" />
+                  <button type="button" onClick={() => setShowJm(s => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white">
+                    {showJm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-white/30 mt-1">devportal.jamendo.com → Sign up → Create app → Copy Client ID</p>
               </div>
             </div>
-            <div className="p-3 bg-white/5 rounded-xl space-y-1.5">
-              <p className="text-xs text-white/60 font-medium">How to get your free key:</p>
-              <p className="text-xs text-white/40">1. Go to devportal.jamendo.com → Sign up free</p>
-              <p className="text-xs text-white/40">2. Create an app → copy the Client ID</p>
-              <p className="text-xs text-white/40">3. Paste it here → browse 600k+ tracks by mood</p>
-            </div>
+
             <div className="flex gap-2 p-3 bg-white/5 rounded-xl">
               <Shield className="w-4 h-4 text-white/40 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-white/40 leading-relaxed">Key stored only in this browser. Music streams directly from Jamendo's CDN.</p>
+              <p className="text-xs text-white/40">Both keys stored only in this browser. Music streams directly from their CDNs.</p>
             </div>
           </div>
         )}
