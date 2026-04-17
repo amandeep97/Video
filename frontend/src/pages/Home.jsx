@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Video, Sparkles, Zap, Globe, Mic, Layers, ChevronRight, Play, Star, Key } from 'lucide-react';
+import { Video, Sparkles, Zap, Globe, Mic, Layers, ChevronRight, Play, Key } from 'lucide-react';
 import ApiKeyModal from '../components/ApiKeyModal.jsx';
 import { hasValidKey, getSettings, PROVIDERS } from '../services/providers.js';
 
@@ -184,21 +184,17 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Social proof */}
-          <div className="flex items-center justify-center gap-4 text-white/40 text-sm">
-            <div className="flex -space-x-2">
-              {['🧑', '👩', '👨', '🧑‍💼', '👩‍💻'].map((emoji, i) => (
-                <div key={i} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center border-2 border-dark-950 text-sm">
-                  {emoji}
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center gap-1">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
-              ))}
-            </div>
-            <span>Loved by 10,000+ creators</span>
+          {/* Honest info strip */}
+          <div className="flex flex-wrap items-center justify-center gap-3 text-white/40 text-sm">
+            <span className="flex items-center gap-1.5 glass px-3 py-1.5 rounded-full text-xs">
+              ⚡ Free with Groq API
+            </span>
+            <span className="flex items-center gap-1.5 glass px-3 py-1.5 rounded-full text-xs">
+              🔑 Your API key, your control
+            </span>
+            <span className="flex items-center gap-1.5 glass px-3 py-1.5 rounded-full text-xs">
+              🚀 No signup needed
+            </span>
           </div>
         </div>
       </section>

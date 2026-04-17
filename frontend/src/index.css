@@ -72,6 +72,10 @@
 }
 
 @layer utilities {
+  .safe-bottom {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+
   .bg-grid {
     background-image:
       linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
