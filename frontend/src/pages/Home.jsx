@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Video, Sparkles, Zap, Globe, Mic, Layers, ChevronRight, Play, Star } from 'lucide-react';
+import { Video, Sparkles, Zap, Globe, Mic, Layers, ChevronRight, Play, Star, Key } from 'lucide-react';
+import ApiKeyModal from '../components/ApiKeyModal.jsx';
+import { loadApiKey } from '../services/api.js';
 
 const EXAMPLE_PROMPTS = [
   'How to start a successful YouTube channel',
@@ -34,6 +36,7 @@ export default function Home() {
   const [prompt, setPrompt] = useState('');
   const [selectedStyle, setSelectedStyle] = useState('professional');
   const [duration, setDuration] = useState(60);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
   const handleCreate = () => {
     if (!prompt.trim()) return;
@@ -56,7 +59,15 @@ export default function Home() {
             </div>
             <span className="text-xl font-bold gradient-text">VideoAI</span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowApiKeyModal(true)}
+              className="btn-secondary py-2 px-4 text-sm flex items-center gap-2"
+              title="Set your Anthropic API key"
+            >
+              <Key className="w-4 h-4" />
+              <span className="hidden sm:inline">{loadApiKey() ? 'API Key ✓' : 'Set API Key'}</span>
+            </button>
             <button
               onClick={() => navigate('/create')}
               className="btn-primary py-2 px-5 text-sm"
@@ -279,6 +290,10 @@ export default function Home() {
           <p className="text-white/30 text-sm">Built with Claude AI · © 2025 VideoAI</p>
         </div>
       </footer>
+
+      {showApiKeyModal && (
+        <ApiKeyModal onClose={() => setShowApiKeyModal(false)} />
+      )}
     </div>
   );
 }

@@ -3,12 +3,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Sparkles, RefreshCw, Download, Copy, Check,
   Settings2, ChevronDown, ChevronUp, Wand2, FileText,
-  Palette, Clock, Users, Mic, AlertCircle, Video
+  Palette, Clock, Users, Mic, AlertCircle, Video, Key
 } from 'lucide-react';
-import { generateScript, regenerateScene } from '../services/api.js';
+import { generateScript, regenerateScene, loadApiKey } from '../services/api.js';
 import VideoPreview from '../components/VideoPreview.jsx';
 import SceneCard from '../components/SceneCard.jsx';
 import SceneEditor from '../components/SceneEditor.jsx';
+import ApiKeyModal from '../components/ApiKeyModal.jsx';
 
 const STYLES = [
   { id: 'professional', label: 'Professional', emoji: '💼' },
@@ -46,16 +47,21 @@ export default function Creator() {
   const [copied, setCopied] = useState(false);
   const [regenerateFeedback, setRegenerateFeedback] = useState('');
   const [feedbackForScene, setFeedbackForScene] = useState(null);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(!!loadApiKey());
 
   // Auto-generate if params provided
   useEffect(() => {
-    if (searchParams.get('topic')) {
+    if (searchParams.get('topic') && loadApiKey()) {
       handleGenerate();
+    } else if (searchParams.get('topic') && !loadApiKey()) {
+      setShowApiKeyModal(true);
     }
   }, []);
 
   const handleGenerate = useCallback(async () => {
     if (!topic.trim()) { setError('Please enter a topic'); return; }
+    if (!loadApiKey()) { setShowApiKeyModal(true); return; }
     setIsGenerating(true);
     setError('');
     setScript(null);
@@ -64,7 +70,7 @@ export default function Creator() {
       const result = await generateScript({ topic, style, duration, tone, audience, language });
       setScript(result);
     } catch (err) {
-      setError(err.message || 'Failed to generate script. Make sure the backend is running with a valid API key.');
+      setError(err.message || 'Failed to generate script. Check your API key in Settings.');
     } finally {
       setIsGenerating(false);
     }
@@ -157,23 +163,46 @@ export default function Creator() {
           )}
         </div>
 
-        {script && (
-          <div className="flex items-center gap-2">
-            <button onClick={handleCopyScript} className="btn-secondary text-sm flex items-center gap-2 py-2">
-              {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
-              {copied ? 'Copied!' : 'Copy Script'}
-            </button>
-            <button onClick={handleExport} className="btn-secondary text-sm flex items-center gap-2 py-2">
-              <Download className="w-4 h-4" />
-              Export
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {script && (
+            <>
+              <button onClick={handleCopyScript} className="btn-secondary text-sm flex items-center gap-2 py-2">
+                {copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
+                <span className="hidden sm:inline">{copied ? 'Copied!' : 'Copy Script'}</span>
+              </button>
+              <button onClick={handleExport} className="btn-secondary text-sm flex items-center gap-2 py-2">
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Export</span>
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => setShowApiKeyModal(true)}
+            className={`btn-secondary text-sm flex items-center gap-2 py-2 ${!hasApiKey ? 'border-yellow-500/40 text-yellow-400' : ''}`}
+            title="API Key Settings"
+          >
+            <Key className="w-4 h-4" />
+            <span className="hidden sm:inline">{hasApiKey ? 'API Key' : 'Set API Key'}</span>
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Left Panel - Settings */}
         <aside className="w-80 xl:w-96 flex-shrink-0 border-r border-white/5 overflow-y-auto p-5 space-y-5">
+          {/* No API key warning */}
+          {!hasApiKey && (
+            <button
+              onClick={() => setShowApiKeyModal(true)}
+              className="w-full flex items-center gap-3 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl hover:bg-yellow-500/15 transition-colors text-left"
+            >
+              <Key className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-yellow-300">API Key Required</p>
+                <p className="text-xs text-yellow-400/70">Click to add your Anthropic API key</p>
+              </div>
+            </button>
+          )}
           {/* Topic Input */}
           <div>
             <label className="text-sm text-white/50 mb-2 block font-medium">Video Topic</label>
@@ -511,6 +540,16 @@ export default function Creator() {
           scene={script.scenes[editingScene]}
           onSave={handleSaveScene}
           onClose={() => setEditingScene(null)}
+        />
+      )}
+
+      {/* API Key Modal */}
+      {showApiKeyModal && (
+        <ApiKeyModal
+          onClose={() => {
+            setShowApiKeyModal(false);
+            setHasApiKey(!!loadApiKey());
+          }}
         />
       )}
     </div>
