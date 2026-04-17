@@ -51,8 +51,15 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageE
     }
   }
 
-  const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp9', 'video/webm', 'video/mp4']
-    .find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
+  // Try MP4 first — works on iOS Safari and is universally playable
+  const mimeType = [
+    'video/mp4;codecs=avc1,mp4a.40.2',
+    'video/mp4;codecs=avc1',
+    'video/mp4',
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp9',
+    'video/webm',
+  ].find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
   const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 4_000_000 });
   const chunks = [];
   recorder.ondataavailable = e => e.data.size > 0 && chunks.push(e.data);
@@ -116,6 +123,7 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
   const [status,    setStatus]   = useState('idle');
   const [progress,  setProgress] = useState({ scene: 0, total: 0, pct: 0 });
   const [videoUrl,  setVideoUrl] = useState('');
+  const [videoMime, setVideoMime]= useState('');
   const [withAudio, setWithAudio]= useState(!!getElevenLabsSettings().apiKey);
   const [errMsg,    setErrMsg]   = useState('');
   const { apiKey: elKey } = getElevenLabsSettings();
@@ -134,8 +142,9 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
           setProgress(p => ({ ...p, scene: done, total, pct: (done / total) * 40 }));
         });
       }
-      const { blob } = await generateVideoBlob(script, setProgress, withAudio, videoEls, imageEls, { format: videoFormat, captions: showCaptions, musicStyle, customMusicUrl });
+      const { blob, mimeType } = await generateVideoBlob(script, setProgress, withAudio, videoEls, imageEls, { format: videoFormat, captions: showCaptions, musicStyle, customMusicUrl });
       setVideoUrl(URL.createObjectURL(blob));
+      setVideoMime(mimeType);
       setStatus('done');
     } catch (e) {
       setErrMsg(e.message); setStatus('error');
@@ -144,9 +153,11 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
 
   const handleDownload = () => {
     if (!videoUrl) return;
+    const ext  = videoMime.includes('mp4') ? 'mp4' : 'webm';
+    const name = (script.title || 'video').replace(/\s+/g, '-').toLowerCase();
     const a = document.createElement('a');
     a.href = videoUrl;
-    a.download = `${(script.title || 'video').replace(/\s+/g, '-').toLowerCase()}.webm`;
+    a.download = `${name}.${ext}`;
     a.click();
   };
 
@@ -162,7 +173,7 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
             </div>
             <div>
               <h3 className="text-lg font-bold">Export Video</h3>
-              <p className="text-xs text-white/40">{pexelsKey ? 'Stock video backgrounds + text' : 'Motion graphics → WebM'}</p>
+              <p className="text-xs text-white/40">{pexelsKey ? 'Stock video backgrounds + text' : 'MP4 on iPhone · WebM on Android/Desktop'}</p>
             </div>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg glass glass-hover flex items-center justify-center">
@@ -262,7 +273,7 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
             <div className="flex gap-3">
               <button onClick={onClose} className="btn-secondary flex-1">Close</button>
               <button onClick={handleDownload} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                <Download className="w-4 h-4" /> Download .webm
+                <Download className="w-4 h-4" /> Download .{videoMime.includes('mp4') ? 'mp4' : 'webm'}
               </button>
             </div>
           </div>
