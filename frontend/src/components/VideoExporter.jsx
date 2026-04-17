@@ -1,112 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { X, Download, Video, Loader2, CheckCircle, AlertCircle, Mic, MicOff } from 'lucide-react';
 import { fetchElevenLabsAudio, getElevenLabsSettings } from '../services/tts.js';
-
-const GRADIENT_PRESETS = {
-  professional: ['#1e3a5f', '#0d2137'],
-  cinematic:    ['#1a0533', '#0a0015'],
-  educational:  ['#0d3d2e', '#041a12'],
-  social:       ['#3d0d2e', '#1a0415'],
-  motivational: ['#3d1a0d', '#1a0804'],
-  documentary:  ['#1a1a2e', '#0d0d1a'],
-};
-
-function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
-  const words = text.split(' ');
-  let line = '';
-  let lineY = y;
-  for (let i = 0; i < words.length; i++) {
-    const test = line + words[i] + ' ';
-    if (ctx.measureText(test).width > maxWidth && i > 0) {
-      ctx.fillText(line.trim(), x, lineY);
-      line = words[i] + ' ';
-      lineY += lineHeight;
-    } else {
-      line = test;
-    }
-  }
-  ctx.fillText(line.trim(), x, lineY);
-}
-
-function renderSceneFrame(ctx, scene, colorScheme, style, progress, W, H) {
-  // Background
-  const bg1 = colorScheme?.background || GRADIENT_PRESETS[style || 'professional']?.[0] || '#1e3a5f';
-  const grad = ctx.createLinearGradient(0, 0, W, H);
-  grad.addColorStop(0, bg1);
-  grad.addColorStop(1, '#080d1a');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W, H);
-
-  // Subtle grid
-  ctx.save();
-  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-  ctx.lineWidth = 1;
-  for (let x = 0; x < W; x += 50) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
-  for (let y = 0; y < H; y += 50) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
-  ctx.restore();
-
-  // Scene number pill
-  ctx.save();
-  ctx.fillStyle = 'rgba(255,255,255,0.08)';
-  ctx.beginPath();
-  ctx.roundRect(24, 24, 72, 30, 15);
-  ctx.fill();
-  ctx.fillStyle = 'rgba(255,255,255,0.45)';
-  ctx.font = '12px -apple-system, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(`Scene ${scene.id}`, 60, 44);
-  ctx.restore();
-
-  // Progress bar
-  const accent = colorScheme?.accent || colorScheme?.primary || '#4f6ef7';
-  ctx.fillStyle = 'rgba(255,255,255,0.08)';
-  ctx.fillRect(0, H - 5, W, 5);
-  ctx.fillStyle = accent;
-  ctx.fillRect(0, H - 5, W * progress, 5);
-
-  // Emoji
-  if (scene.emoji) {
-    const scale = 1 + Math.sin(progress * Math.PI * 4) * 0.04;
-    ctx.save();
-    ctx.font = `${68 * scale}px serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.globalAlpha = 0.92;
-    ctx.fillText(scene.emoji, W / 2, H * 0.3);
-    ctx.restore();
-  }
-
-  // Title (fade in/out)
-  const titleAlpha = progress < 0.1 ? progress / 0.1 : progress > 0.85 ? (1 - progress) / 0.15 : 1;
-  ctx.save();
-  ctx.globalAlpha = titleAlpha;
-  ctx.font = `bold 26px -apple-system, BlinkMacSystemFont, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.fillStyle = colorScheme?.text || '#ffffff';
-  ctx.shadowColor = 'rgba(0,0,0,0.6)';
-  ctx.shadowBlur = 12;
-  wrapText(ctx, scene.title || '', W / 2, H * 0.5, W - 80, 34);
-  ctx.restore();
-
-  // Key points slide in
-  (scene.keyPoints || []).forEach((point, i) => {
-    const delay = 0.3 + i * 0.12;
-    const alpha = Math.max(0, Math.min(1, (progress - delay) / 0.1));
-    if (alpha <= 0) return;
-    const py = H * 0.63 + i * 32;
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = accent;
-    ctx.beginPath();
-    ctx.arc(W / 2 - W * 0.34 + 6, py + 1, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.82)';
-    ctx.font = '13px -apple-system, sans-serif';
-    ctx.textAlign = 'left';
-    ctx.fillText(point, W / 2 - W * 0.34 + 18, py + 5);
-    ctx.restore();
-  });
-}
+import { renderFrame } from '../services/videoRenderer.js';
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -114,11 +9,9 @@ async function generateVideoBlob(script, onProgress, withAudio) {
   const W = 720, H = 405;
   const FPS = 30;
   const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
+  canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
 
-  // Set up streams
   const videoStream = canvas.captureStream(FPS);
   let combinedStream = videoStream;
   let audioCtx = null, audioDest = null;
@@ -153,7 +46,7 @@ async function generateVideoBlob(script, onProgress, withAudio) {
 
     onProgress({ scene: si + 1, total: totalScenes, phase: 'rendering', pct: (si / totalScenes) * 100 });
 
-    // Pre-fetch audio (non-blocking start)
+    // Pre-fetch audio
     let audioBlob = null;
     if (withAudio && elKey && audioDest && audioCtx) {
       try {
@@ -163,7 +56,6 @@ async function generateVideoBlob(script, onProgress, withAudio) {
       }
     }
 
-    // Schedule audio to play during this scene
     if (audioBlob && audioCtx && audioDest) {
       const arrayBuf = await audioBlob.arrayBuffer();
       const decoded = await audioCtx.decodeAudioData(arrayBuf);
@@ -174,17 +66,17 @@ async function generateVideoBlob(script, onProgress, withAudio) {
       src.start(audioCtx.currentTime);
     }
 
-    // Render frames for this scene duration
+    // Render frames
+    const sceneStartTs = performance.now();
     for (let f = 0; f < frames; f++) {
       const progress = f / frames;
-      renderSceneFrame(ctx, scene, script.colorScheme, script.style, progress, W, H);
-      // Throttle to ~real-time so MediaRecorder captures at proper rate
+      const fakeTimestamp = sceneStartTs + (f / FPS) * 1000;
+      renderFrame(ctx, scene, script, si, totalScenes, progress, fakeTimestamp);
       const elapsed = performance.now() - startTime;
       const expected = (f / FPS) * 1000;
       if (expected > elapsed) await sleep(expected - elapsed);
     }
 
-    // Make sure scene duration is fully covered (wait for audio if longer)
     const elapsed = performance.now() - startTime;
     if (elapsed < durationMs) await sleep(durationMs - elapsed);
   }
@@ -203,7 +95,7 @@ async function generateVideoBlob(script, onProgress, withAudio) {
 }
 
 export default function VideoExporter({ script, onClose }) {
-  const [status, setStatus] = useState('idle'); // idle | generating | done | error
+  const [status, setStatus] = useState('idle');
   const [progress, setProgress] = useState({ scene: 0, total: 0, pct: 0, phase: '' });
   const [videoUrl, setVideoUrl] = useState('');
   const [withAudio, setWithAudio] = useState(!!getElevenLabsSettings().apiKey);
@@ -211,12 +103,10 @@ export default function VideoExporter({ script, onClose }) {
   const { apiKey: elKey } = getElevenLabsSettings();
 
   const handleGenerate = async () => {
-    setStatus('generating');
-    setErrMsg('');
+    setStatus('generating'); setErrMsg('');
     try {
       const { blob, mimeType } = await generateVideoBlob(script, setProgress, withAudio);
-      const url = URL.createObjectURL(blob);
-      setVideoUrl(url);
+      setVideoUrl(URL.createObjectURL(blob));
       setStatus('done');
     } catch (e) {
       setErrMsg(e.message);
@@ -244,7 +134,7 @@ export default function VideoExporter({ script, onClose }) {
             </div>
             <div>
               <h3 className="text-lg font-bold">Export Video File</h3>
-              <p className="text-xs text-white/40">Canvas animations → WebM video</p>
+              <p className="text-xs text-white/40">Motion graphics → WebM video</p>
             </div>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg glass glass-hover flex items-center justify-center">
@@ -265,11 +155,10 @@ export default function VideoExporter({ script, onClose }) {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-white/50">Format</span>
-                <span className="text-white">WebM (plays in Chrome, Edge, Firefox)</span>
+                <span className="text-white">WebM (Chrome, Edge, Firefox)</span>
               </div>
             </div>
 
-            {/* Audio option */}
             <div className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
               withAudio && elKey ? 'bg-green-500/10 border-green-500/30' : 'glass border-white/10'
             }`}>
@@ -278,7 +167,7 @@ export default function VideoExporter({ script, onClose }) {
                 <div>
                   <p className="text-sm font-medium">{elKey ? 'AI Voice Narration' : 'Silent Video'}</p>
                   <p className="text-xs text-white/40">
-                    {elKey ? 'ElevenLabs realistic voice will be added' : 'Add ElevenLabs key in Settings for voice'}
+                    {elKey ? 'ElevenLabs voice will be mixed in' : 'Add ElevenLabs key in Settings for voice'}
                   </p>
                 </div>
               </div>
@@ -290,9 +179,7 @@ export default function VideoExporter({ script, onClose }) {
               )}
             </div>
 
-            <p className="text-xs text-white/30 text-center">
-              The export runs in real-time — it takes as long as the video duration.
-            </p>
+            <p className="text-xs text-white/30 text-center">Export runs in real-time — keep this tab open.</p>
 
             <button onClick={handleGenerate} className="btn-primary w-full py-4 flex items-center justify-center gap-3">
               <Video className="w-5 h-5" />
@@ -306,12 +193,11 @@ export default function VideoExporter({ script, onClose }) {
             <div className="text-center">
               <Loader2 className="w-12 h-12 text-brand-400 animate-spin mx-auto mb-4" />
               <p className="text-lg font-semibold">Rendering Scene {progress.scene} / {progress.total}</p>
-              <p className="text-sm text-white/40 mt-1">{progress.phase === 'rendering' ? 'Animating frames...' : 'Processing...'}</p>
+              <p className="text-sm text-white/40 mt-1">Animating frames...</p>
             </div>
             <div className="space-y-2">
               <div className="flex justify-between text-xs text-white/40">
-                <span>Progress</span>
-                <span>{Math.round(progress.pct)}%</span>
+                <span>Progress</span><span>{Math.round(progress.pct)}%</span>
               </div>
               <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                 <div className="h-full bg-gradient-to-r from-brand-500 to-purple-500 rounded-full transition-all duration-300"
@@ -327,14 +213,13 @@ export default function VideoExporter({ script, onClose }) {
             <div className="text-center py-2">
               <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
               <p className="text-lg font-semibold text-green-400">Video Ready!</p>
-              <p className="text-sm text-white/40 mt-1">Your video has been generated</p>
+              <p className="text-sm text-white/40 mt-1">Your motion graphics video is ready</p>
             </div>
             <video src={videoUrl} controls className="w-full rounded-xl bg-black" />
             <div className="flex gap-3">
               <button onClick={onClose} className="btn-secondary flex-1">Close</button>
               <button onClick={handleDownload} className="btn-primary flex-1 flex items-center justify-center gap-2">
-                <Download className="w-4 h-4" />
-                Download .webm
+                <Download className="w-4 h-4" /> Download .webm
               </button>
             </div>
           </div>
