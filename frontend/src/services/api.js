@@ -116,6 +116,7 @@ Generate exactly ${sceneCount} scenes. Return ONLY this JSON (no markdown):
       "duration": 15,
       "narration": "Full narration (2-4 sentences)",
       "visualDescription": "What to show visually",
+      "videoKeyword": "2-3 word stock footage search term (e.g. 'city skyline night')",
       "keyPoints": ["point 1", "point 2"],
       "emoji": "relevant emoji",
       "transition": "fade"

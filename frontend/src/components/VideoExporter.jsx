@@ -1,13 +1,13 @@
 import { useState } from 'react';
-import { X, Download, Video, Loader2, CheckCircle, AlertCircle, Mic, MicOff } from 'lucide-react';
+import { X, Download, Video, Loader2, CheckCircle, AlertCircle, Mic, MicOff, Film } from 'lucide-react';
 import { fetchElevenLabsAudio, getElevenLabsSettings } from '../services/tts.js';
 import { renderFrame } from '../services/videoRenderer.js';
+import { preloadSceneVideos, getPexelsKey } from '../services/pexels.js';
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-async function generateVideoBlob(script, onProgress, withAudio) {
-  const W = 720, H = 405;
-  const FPS = 30;
+async function generateVideoBlob(script, onProgress, withAudio, videoEls) {
+  const W = 720, H = 405, FPS = 30;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -17,9 +17,8 @@ async function generateVideoBlob(script, onProgress, withAudio) {
   let audioCtx = null, audioDest = null;
 
   const { apiKey: elKey, voiceId } = getElevenLabsSettings();
-
   if (withAudio && elKey) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
+    audioCtx  = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
     audioDest = audioCtx.createMediaStreamDestination();
     combinedStream = new MediaStream([
       ...videoStream.getVideoTracks(),
@@ -29,63 +28,56 @@ async function generateVideoBlob(script, onProgress, withAudio) {
 
   const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp9', 'video/webm', 'video/mp4']
     .find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
-
-  const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 3_000_000 });
+  const recorder = new MediaRecorder(combinedStream, { mimeType, videoBitsPerSecond: 4_000_000 });
   const chunks = [];
   recorder.ondataavailable = e => e.data.size > 0 && chunks.push(e.data);
   recorder.start(200);
 
   const scenes = script.scenes || [];
-  const totalScenes = scenes.length;
-
   for (let si = 0; si < scenes.length; si++) {
-    const scene = scenes[si];
+    const scene      = scenes[si];
     const durationMs = (scene.duration || 15) * 1000;
-    const frames = Math.round((durationMs / 1000) * FPS);
-    const startTime = performance.now();
+    const frames     = Math.round((durationMs / 1000) * FPS);
+    const startTime  = performance.now();
+    onProgress({ scene: si + 1, total: scenes.length, phase: 'rendering', pct: (si / scenes.length) * 100 });
 
-    onProgress({ scene: si + 1, total: totalScenes, phase: 'rendering', pct: (si / totalScenes) * 100 });
-
-    // Pre-fetch audio
-    let audioBlob = null;
+    // Audio
     if (withAudio && elKey && audioDest && audioCtx) {
       try {
-        audioBlob = await fetchElevenLabsAudio(scene.narration, elKey, voiceId);
+        const blob     = await fetchElevenLabsAudio(scene.narration, elKey, voiceId);
+        const arrayBuf = await blob.arrayBuffer();
+        const decoded  = await audioCtx.decodeAudioData(arrayBuf);
+        const src      = audioCtx.createBufferSource();
+        src.buffer = decoded;
+        src.connect(audioDest);
+        src.connect(audioCtx.destination);
+        src.start(audioCtx.currentTime);
       } catch (e) {
-        console.warn('ElevenLabs audio failed for scene', si + 1, e.message);
+        console.warn('Audio failed for scene', si + 1, e.message);
       }
     }
 
-    if (audioBlob && audioCtx && audioDest) {
-      const arrayBuf = await audioBlob.arrayBuffer();
-      const decoded = await audioCtx.decodeAudioData(arrayBuf);
-      const src = audioCtx.createBufferSource();
-      src.buffer = decoded;
-      src.connect(audioDest);
-      src.connect(audioCtx.destination);
-      src.start(audioCtx.currentTime);
-    }
+    // Start background video
+    const bgVideo = videoEls[si] || null;
+    if (bgVideo) { bgVideo.currentTime = 0; bgVideo.play().catch(() => {}); }
 
     // Render frames
-    const sceneStartTs = performance.now();
+    const tsBase = performance.now();
     for (let f = 0; f < frames; f++) {
       const progress = f / frames;
-      const fakeTimestamp = sceneStartTs + (f / FPS) * 1000;
-      renderFrame(ctx, scene, script, si, totalScenes, progress, fakeTimestamp);
-      const elapsed = performance.now() - startTime;
+      renderFrame(ctx, scene, script, si, scenes.length, progress, tsBase + (f / FPS) * 1000, bgVideo);
+      const elapsed  = performance.now() - startTime;
       const expected = (f / FPS) * 1000;
       if (expected > elapsed) await sleep(expected - elapsed);
     }
 
+    bgVideo?.pause();
     const elapsed = performance.now() - startTime;
     if (elapsed < durationMs) await sleep(durationMs - elapsed);
   }
 
-  // Outro black frame
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
   await sleep(500);
-
   recorder.stop();
   if (audioCtx) await audioCtx.close();
 
@@ -95,22 +87,26 @@ async function generateVideoBlob(script, onProgress, withAudio) {
 }
 
 export default function VideoExporter({ script, onClose }) {
-  const [status, setStatus] = useState('idle');
-  const [progress, setProgress] = useState({ scene: 0, total: 0, pct: 0, phase: '' });
-  const [videoUrl, setVideoUrl] = useState('');
-  const [withAudio, setWithAudio] = useState(!!getElevenLabsSettings().apiKey);
-  const [errMsg, setErrMsg] = useState('');
+  const [status,    setStatus]   = useState('idle');
+  const [progress,  setProgress] = useState({ scene: 0, total: 0, pct: 0 });
+  const [videoUrl,  setVideoUrl] = useState('');
+  const [withAudio, setWithAudio]= useState(!!getElevenLabsSettings().apiKey);
+  const [errMsg,    setErrMsg]   = useState('');
   const { apiKey: elKey } = getElevenLabsSettings();
+  const pexelsKey = getPexelsKey();
 
   const handleGenerate = async () => {
     setStatus('generating'); setErrMsg('');
     try {
-      const { blob, mimeType } = await generateVideoBlob(script, setProgress, withAudio);
+      // Load Pexels videos before export
+      const videoEls = pexelsKey
+        ? await preloadSceneVideos(script.scenes, pexelsKey)
+        : {};
+      const { blob } = await generateVideoBlob(script, setProgress, withAudio, videoEls);
       setVideoUrl(URL.createObjectURL(blob));
       setStatus('done');
     } catch (e) {
-      setErrMsg(e.message);
-      setStatus('error');
+      setErrMsg(e.message); setStatus('error');
     }
   };
 
@@ -133,8 +129,8 @@ export default function VideoExporter({ script, onClose }) {
               <Video className="w-5 h-5 text-brand-400" />
             </div>
             <div>
-              <h3 className="text-lg font-bold">Export Video File</h3>
-              <p className="text-xs text-white/40">Motion graphics → WebM video</p>
+              <h3 className="text-lg font-bold">Export Video</h3>
+              <p className="text-xs text-white/40">{pexelsKey ? 'Stock video backgrounds + text' : 'Motion graphics → WebM'}</p>
             </div>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg glass glass-hover flex items-center justify-center">
@@ -154,11 +150,22 @@ export default function VideoExporter({ script, onClose }) {
                 <span className="text-white">{estimatedTime}s (~{Math.ceil(estimatedTime / 60)} min to export)</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-white/50">Format</span>
-                <span className="text-white">WebM (Chrome, Edge, Firefox)</span>
+                <span className="text-white/50">Background</span>
+                <span className={pexelsKey ? 'text-green-400' : 'text-white/50'}>
+                  {pexelsKey ? '🎬 Stock video (Pexels)' : 'Motion graphics'}
+                </span>
               </div>
             </div>
 
+            {/* Pexels notice */}
+            {!pexelsKey && (
+              <div className="flex gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                <Film className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-300">Add a free Pexels API key in Settings → Stock Video to use real video backgrounds</p>
+              </div>
+            )}
+
+            {/* Audio toggle */}
             <div className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
               withAudio && elKey ? 'bg-green-500/10 border-green-500/30' : 'glass border-white/10'
             }`}>
@@ -166,9 +173,7 @@ export default function VideoExporter({ script, onClose }) {
                 {withAudio && elKey ? <Mic className="w-5 h-5 text-green-400" /> : <MicOff className="w-5 h-5 text-white/40" />}
                 <div>
                   <p className="text-sm font-medium">{elKey ? 'AI Voice Narration' : 'Silent Video'}</p>
-                  <p className="text-xs text-white/40">
-                    {elKey ? 'ElevenLabs voice will be mixed in' : 'Add ElevenLabs key in Settings for voice'}
-                  </p>
+                  <p className="text-xs text-white/40">{elKey ? 'ElevenLabs voice mixed in' : 'Add ElevenLabs key in Settings'}</p>
                 </div>
               </div>
               {elKey && (
@@ -180,10 +185,8 @@ export default function VideoExporter({ script, onClose }) {
             </div>
 
             <p className="text-xs text-white/30 text-center">Export runs in real-time — keep this tab open.</p>
-
             <button onClick={handleGenerate} className="btn-primary w-full py-4 flex items-center justify-center gap-3">
-              <Video className="w-5 h-5" />
-              Generate Video ({estimatedTime}s)
+              <Video className="w-5 h-5" /> Generate Video ({estimatedTime}s)
             </button>
           </div>
         )}
@@ -193,7 +196,7 @@ export default function VideoExporter({ script, onClose }) {
             <div className="text-center">
               <Loader2 className="w-12 h-12 text-brand-400 animate-spin mx-auto mb-4" />
               <p className="text-lg font-semibold">Rendering Scene {progress.scene} / {progress.total}</p>
-              <p className="text-sm text-white/40 mt-1">Animating frames...</p>
+              <p className="text-sm text-white/40 mt-1">Compositing video + text layers...</p>
             </div>
             <div className="space-y-2">
               <div className="flex justify-between text-xs text-white/40">
@@ -213,7 +216,6 @@ export default function VideoExporter({ script, onClose }) {
             <div className="text-center py-2">
               <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
               <p className="text-lg font-semibold text-green-400">Video Ready!</p>
-              <p className="text-sm text-white/40 mt-1">Your motion graphics video is ready</p>
             </div>
             <video src={videoUrl} controls className="w-full rounded-xl bg-black" />
             <div className="flex gap-3">

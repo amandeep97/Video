@@ -499,14 +499,38 @@ function detectLayout(scene, sceneIndex, totalScenes) {
   return 'content';
 }
 
+// ── Draw video background with cinematic overlay ─────────────────────────────
+function drawVideoBackground(ctx, bgVideo, theme, W, H) {
+  try {
+    const vw = bgVideo.videoWidth || W;
+    const vh = bgVideo.videoHeight || H;
+    const scale = Math.max(W / vw, H / vh);
+    const sw = vw * scale, sh = vh * scale;
+    ctx.drawImage(bgVideo, (W - sw) / 2, (H - sh) / 2, sw, sh);
+  } catch {
+    drawBackground(ctx, theme, W, H, 0);
+    return;
+  }
+  // Cinematic vignette overlay — dark top/bottom, lighter middle
+  const overlay = ctx.createLinearGradient(0, 0, 0, H);
+  overlay.addColorStop(0,    'rgba(0,0,0,0.60)');
+  overlay.addColorStop(0.35, 'rgba(0,0,0,0.28)');
+  overlay.addColorStop(0.65, 'rgba(0,0,0,0.32)');
+  overlay.addColorStop(1,    'rgba(0,0,0,0.68)');
+  ctx.fillStyle = overlay;
+  ctx.fillRect(0, 0, W, H);
+  // Subtle accent tint
+  ctx.fillStyle = rgba(theme.accent, 0.07);
+  ctx.fillRect(0, 0, W, H);
+}
+
 // ── Main public render function ───────────────────────────────────────────────
-export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progress, timestamp) {
+export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progress, timestamp, bgVideo = null) {
   const W = ctx.canvas.width;
   const H = ctx.canvas.height;
   const style = script?.style || 'professional';
   const theme = { ...STYLE_THEMES[style] || STYLE_THEMES.professional };
 
-  // Override with script colorScheme if provided
   if (script?.colorScheme?.accent) theme.accent = script.colorScheme.accent;
   if (script?.colorScheme?.background) theme.bg1 = script.colorScheme.background;
   if (script?.colorScheme?.text) theme.text = script.colorScheme.text;
@@ -514,17 +538,20 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
   const t = timestamp / 1000;
   const p = clamp(progress, 0, 1);
   const layout = detectLayout(scene, sceneIndex, totalScenes);
+  const hasVideo = bgVideo && bgVideo.readyState >= 2;
 
-  // Layer 1: background
-  drawBackground(ctx, theme, W, H, t);
+  // Layer 1: background (video or gradient)
+  if (hasVideo) {
+    drawVideoBackground(ctx, bgVideo, theme, W, H);
+  } else {
+    drawBackground(ctx, theme, W, H, t);
+    drawParticles(ctx, theme, W, H, t);
+  }
 
-  // Layer 2: particles
-  drawParticles(ctx, theme, W, H, t);
-
-  // Layer 3: geometric accents
+  // Layer 2: geometric accents
   drawAccents(ctx, theme, W, H, t, layout);
 
-  // Layer 4: scene content
+  // Layer 3: scene content
   ctx.save();
   switch (layout) {
     case 'intro':      renderIntro(ctx, scene, theme, W, H, p, t);     break;
@@ -535,7 +562,7 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
   }
   ctx.restore();
 
-  // Layer 5: HUD
+  // Layer 4: HUD
   drawScenePill(ctx, theme, sceneIndex + 1, totalScenes, W, t);
   drawProgressBar(ctx, theme, W, H, p);
 }
