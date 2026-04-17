@@ -63,7 +63,7 @@
 
   .scene-card {
     @apply glass rounded-xl p-4 cursor-pointer transition-all duration-200
-           hover:border-brand-500/40 hover:bg-white/8;
+           hover:border-brand-500/40 hover:bg-white/10;
   }
 
   .scene-card.active {
