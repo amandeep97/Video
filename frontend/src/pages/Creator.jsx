@@ -218,23 +218,53 @@ export default function Creator() {
         </div>
       </div>
 
-      {/* Video Format */}
+      {/* Platform selector */}
       <div>
-        <label className="text-sm text-white/50 mb-2 block font-medium">Video Format</label>
-        <div className="grid grid-cols-3 gap-2">
+        <label className="text-sm text-white/50 mb-2 block font-medium">Platform</label>
+        <div className="grid grid-cols-4 gap-2">
           {[
-            { id: 'landscape', label: '16:9', sub: 'YouTube', icon: Monitor },
-            { id: 'portrait',  label: '9:16', sub: 'Reels/Shorts', icon: Smartphone },
-            { id: 'square',    label: '1:1',  sub: 'Instagram', icon: Square },
-          ].map(({ id, label, sub, icon: Icon }) => (
-            <button key={id} onClick={() => setVideoFormat(id)}
-              className={`py-2.5 px-2 rounded-xl text-center text-xs transition-all border flex flex-col items-center gap-1 ${
-                videoFormat === id ? 'bg-brand-500/25 border-brand-500/60 text-white' : 'glass border-transparent text-white/50 hover:text-white'
-              }`}>
-              <Icon className="w-4 h-4" />
-              <span className="font-bold">{label}</span>
-              <span className="text-white/30 text-[10px]">{sub}</span>
-            </button>
+            { id: 'instagram-reel', label: 'Reels',   emoji: '📸', format: 'portrait',  bg: 'from-pink-500 to-orange-400',  captions: true,  music: 'motivational' },
+            { id: 'tiktok',         label: 'TikTok',  emoji: '🎵', format: 'portrait',  bg: 'from-gray-900 to-gray-700',    captions: true,  music: 'motivational' },
+            { id: 'yt-shorts',      label: 'Shorts',  emoji: '▶️', format: 'portrait',  bg: 'from-red-600 to-red-500',      captions: true,  music: 'none' },
+            { id: 'youtube',        label: 'YouTube', emoji: '📺', format: 'landscape', bg: 'from-red-600 to-red-700',      captions: false, music: 'professional' },
+            { id: 'facebook',       label: 'Facebook',emoji: '📘', format: 'landscape', bg: 'from-blue-600 to-blue-500',    captions: false, music: 'professional' },
+            { id: 'instagram-feed', label: 'Insta',   emoji: '🟣', format: 'square',   bg: 'from-purple-500 to-pink-500',  captions: false, music: 'none' },
+            { id: 'twitter',        label: 'X/Twitter',emoji: '🐦',format: 'landscape', bg: 'from-gray-800 to-gray-900',   captions: false, music: 'none' },
+            { id: 'custom',         label: 'Custom',  emoji: '⚙️', format: videoFormat, bg: 'from-brand-600 to-purple-600', captions: showCaptions, music: musicStyle },
+          ].map(p => {
+            const isActive = (() => {
+              if (p.id === 'custom') return false;
+              return videoFormat === p.format;
+            })();
+            return (
+              <button key={p.id} onClick={() => {
+                if (p.id !== 'custom') {
+                  setVideoFormat(p.format);
+                  setShowCaptions(p.captions);
+                  setMusicStyle(p.music);
+                }
+              }}
+                className={`relative flex flex-col items-center gap-1.5 py-3 px-1 rounded-xl text-center transition-all border ${
+                  isActive ? 'border-white/40 bg-white/10' : 'glass border-white/10 hover:border-white/20'
+                }`}>
+                <span className="text-xl">{p.emoji}</span>
+                <span className="text-[10px] font-medium text-white/70 leading-tight">{p.label}</span>
+                {isActive && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-400" />}
+              </button>
+            );
+          })}
+        </div>
+        {/* Format pills */}
+        <div className="flex gap-1.5 mt-2">
+          {[
+            { id: 'landscape', label: '16:9 Landscape' },
+            { id: 'portrait',  label: '9:16 Portrait' },
+            { id: 'square',    label: '1:1 Square' },
+          ].map(f => (
+            <button key={f.id} onClick={() => setVideoFormat(f.id)}
+              className={`flex-1 py-1.5 rounded-lg text-[10px] font-medium transition-all ${
+                videoFormat === f.id ? 'bg-brand-500/30 text-brand-300 border border-brand-500/50' : 'glass text-white/40 hover:text-white'
+              }`}>{f.label}</button>
           ))}
         </div>
       </div>
