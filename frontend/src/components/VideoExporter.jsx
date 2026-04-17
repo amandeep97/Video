@@ -98,7 +98,7 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageE
     const tsBase = performance.now();
     for (let f = 0; f < frames; f++) {
       const progress = f / frames;
-      renderFrame(ctx, scene, script, si, scenes.length, progress, tsBase + (f / FPS) * 1000, bgVideo, bgImage, { captions: opts.captions });
+      renderFrame(ctx, scene, script, si, scenes.length, progress, tsBase + (f / FPS) * 1000, bgVideo, bgImage, { captions: opts.captions, export: true });
       const elapsed  = performance.now() - startTime;
       const expected = (f / FPS) * 1000;
       if (expected > elapsed) await sleep(expected - elapsed);

@@ -642,7 +642,9 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
     renderCaptions(ctx, scene.narration, p, W, H);
   }
 
-  // Layer 5: HUD
-  drawScenePill(ctx, theme, sceneIndex + 1, totalScenes, W, t);
-  drawProgressBar(ctx, theme, W, H, p);
+  // Layer 5: HUD (only in preview, not exported video)
+  if (!opts.export) {
+    drawScenePill(ctx, theme, sceneIndex + 1, totalScenes, W, t);
+    drawProgressBar(ctx, theme, W, H, p);
+  }
 }
