@@ -14,6 +14,7 @@ import SceneCard from '../components/SceneCard.jsx';
 import SceneEditor from '../components/SceneEditor.jsx';
 import ApiKeyModal from '../components/ApiKeyModal.jsx';
 import VideoExporter from '../components/VideoExporter.jsx';
+import MusicPicker from '../components/MusicPicker.jsx';
 
 // ── Stable components defined OUTSIDE Creator to prevent remount on re-render ──
 
@@ -94,6 +95,8 @@ export default function Creator() {
   const [musicStyle,         setMusicStyle]         = useState('none');
   const [customMusicUrl,     setCustomMusicUrl]     = useState(null);
   const [customMusicName,    setCustomMusicName]    = useState('');
+  const [selectedTrack,      setSelectedTrack]      = useState(null);
+  const [showMusicPicker,    setShowMusicPicker]    = useState(false);
 
   // Modal state
   const [showApiKeyModal,    setShowApiKeyModal]    = useState(false);
@@ -101,6 +104,19 @@ export default function Creator() {
   const [hasApiKey,          setHasApiKey]          = useState(hasValidKey());
 
   const refreshKeyState = () => setHasApiKey(hasValidKey());
+
+  const handleTrackSelect = (track) => {
+    setSelectedTrack(track);
+    if (track) {
+      setMusicStyle('custom');
+      setCustomMusicUrl(track.url);
+      setCustomMusicName(track.title);
+    } else {
+      setMusicStyle('none');
+      setCustomMusicUrl(null);
+      setCustomMusicName('');
+    }
+  };
 
   const currentProviderName = () => PROVIDERS[getSettings().providerId]?.name || 'AI';
 
@@ -242,6 +258,9 @@ export default function Creator() {
                   setVideoFormat(p.format);
                   setShowCaptions(p.captions);
                   setMusicStyle(p.music);
+                  setSelectedTrack(null);
+                  setCustomMusicUrl(null);
+                  setCustomMusicName('');
                 }
               }}
                 className={`relative flex flex-col items-center gap-1.5 py-3 px-1 rounded-xl text-center transition-all border ${
@@ -253,6 +272,7 @@ export default function Creator() {
               </button>
             );
           })}
+
         </div>
         {/* Format pills */}
         <div className="flex gap-1.5 mt-2">
@@ -270,69 +290,97 @@ export default function Creator() {
       </div>
 
       {/* Captions + Music */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="space-y-2">
         <div className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
           showCaptions ? 'bg-brand-500/15 border-brand-500/40' : 'glass border-transparent'
         }`} onClick={() => setShowCaptions(c => !c)}>
           <Captions className={`w-4 h-4 ${showCaptions ? 'text-brand-400' : 'text-white/40'}`} />
-          <div>
+          <div className="flex-1">
             <p className="text-xs font-medium text-white">Captions</p>
-            <p className="text-[10px] text-white/30">{showCaptions ? 'ON' : 'OFF'}</p>
+            <p className="text-[10px] text-white/30">{showCaptions ? 'ON — word-by-word subtitles' : 'OFF'}</p>
           </div>
         </div>
-        <div>
-          <select value={musicStyle} onChange={e => { setMusicStyle(e.target.value); if (e.target.value !== 'custom') { setCustomMusicUrl(null); setCustomMusicName(''); } }}
-            className="input-field text-xs py-2.5 w-full">
-            <option value="none">🔇 No Music</option>
-            <option value="professional">🎵 Calm / Soft</option>
-            <option value="motivational">🔥 Energetic</option>
-            <option value="cinematic">🎬 Cinematic</option>
-            <option value="custom">🎶 My Own Song</option>
-          </select>
-        </div>
-      </div>
 
-      {/* Custom music upload */}
-      {musicStyle === 'custom' && (
-        <div className="space-y-2">
-          <label className="block w-full cursor-pointer">
-            <div className={`flex items-center gap-3 p-3 rounded-xl border-2 border-dashed transition-all ${
-              customMusicUrl ? 'border-green-500/50 bg-green-500/10' : 'border-white/20 hover:border-brand-500/50 hover:bg-brand-500/5'
-            }`}>
-              <Music className={`w-5 h-5 flex-shrink-0 ${customMusicUrl ? 'text-green-400' : 'text-white/40'}`} />
-              <div className="flex-1 min-w-0">
-                {customMusicUrl ? (
-                  <>
-                    <p className="text-xs font-medium text-green-400">Song uploaded ✓</p>
-                    <p className="text-xs text-white/40 truncate">{customMusicName}</p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-xs font-medium text-white">Upload your song</p>
-                    <p className="text-xs text-white/30">MP3, WAV, OGG supported</p>
-                  </>
-                )}
-              </div>
-              {customMusicUrl && (
-                <button type="button" onClick={e => { e.preventDefault(); URL.revokeObjectURL(customMusicUrl); setCustomMusicUrl(null); setCustomMusicName(''); }}
-                  className="text-white/30 hover:text-red-400 text-xs px-2">✕</button>
+        {/* Music row */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowMusicPicker(true)}
+            className={`flex-1 flex items-center gap-2.5 p-3 rounded-xl border transition-all ${
+              selectedTrack
+                ? 'bg-brand-500/15 border-brand-500/40'
+                : 'glass border-transparent hover:border-white/20'
+            }`}
+          >
+            <Music className={`w-4 h-4 flex-shrink-0 ${selectedTrack ? 'text-brand-400' : 'text-white/40'}`} />
+            <div className="flex-1 min-w-0 text-left">
+              {selectedTrack ? (
+                <>
+                  <p className="text-xs font-medium text-brand-300 truncate">{selectedTrack.title}</p>
+                  <p className="text-[10px] text-white/40 truncate">{selectedTrack.artist}</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs font-medium text-white">Add Music</p>
+                  <p className="text-[10px] text-white/30">Browse library</p>
+                </>
               )}
             </div>
-            <input type="file" accept="audio/*" className="hidden" onChange={e => {
-              const file = e.target.files[0];
-              if (!file) return;
-              if (customMusicUrl) URL.revokeObjectURL(customMusicUrl);
-              setCustomMusicUrl(URL.createObjectURL(file));
-              setCustomMusicName(file.name);
-            }} />
-          </label>
+            {!selectedTrack && <span className="text-white/30 text-xs">+</span>}
+          </button>
+          {selectedTrack && (
+            <button
+              onClick={() => { setSelectedTrack(null); setMusicStyle('none'); setCustomMusicUrl(null); setCustomMusicName(''); }}
+              className="w-9 h-9 glass glass-hover rounded-xl flex items-center justify-center text-white/40 hover:text-red-400 text-sm"
+            >✕</button>
+          )}
+        </div>
+
+        {/* Upload your own song */}
+        <label className="block cursor-pointer">
+          <div className={`flex items-center gap-2.5 p-3 rounded-xl border-2 border-dashed transition-all ${
+            musicStyle === 'custom' && customMusicUrl
+              ? 'border-green-500/40 bg-green-500/8'
+              : 'border-white/10 hover:border-white/20'
+          }`}>
+            <span className="text-base">{musicStyle === 'custom' && customMusicUrl ? '✅' : '🎶'}</span>
+            <div className="flex-1 min-w-0">
+              {musicStyle === 'custom' && customMusicUrl ? (
+                <>
+                  <p className="text-xs font-medium text-green-400">Your song uploaded</p>
+                  <p className="text-[10px] text-white/40 truncate">{customMusicName}</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs font-medium text-white/60">Upload your own song</p>
+                  <p className="text-[10px] text-white/30">MP3, WAV, OGG</p>
+                </>
+              )}
+            </div>
+            {musicStyle === 'custom' && customMusicUrl && (
+              <button type="button" onClick={e => { e.preventDefault(); URL.revokeObjectURL(customMusicUrl); setCustomMusicUrl(null); setCustomMusicName(''); setMusicStyle('none'); }}
+                className="text-white/30 hover:text-red-400 text-xs px-1">✕</button>
+            )}
+          </div>
+          <input type="file" accept="audio/*" className="hidden" onChange={e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (customMusicUrl) URL.revokeObjectURL(customMusicUrl);
+            setSelectedTrack(null);
+            setMusicStyle('custom');
+            setCustomMusicUrl(URL.createObjectURL(file));
+            setCustomMusicName(file.name);
+          }} />
+        </label>
+
+        {(selectedTrack || (musicStyle === 'custom' && customMusicUrl)) && (
           <div className="flex items-center gap-2 px-1">
+            <Music className="w-3 h-3 text-white/30" />
             <input type="range" min={0} max={100} defaultValue={25} className="flex-1 accent-brand-500 h-1.5"
               onChange={e => document.dispatchEvent(new CustomEvent('music-volume', { detail: e.target.value / 100 }))} />
-            <span className="text-xs text-white/30">Vol</span>
+            <span className="text-[10px] text-white/30">Vol</span>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Voice language */}
       <div>
@@ -664,6 +712,9 @@ export default function Creator() {
       )}
       {showExporter && script && (
         <VideoExporter script={script} onClose={() => setShowExporter(false)} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} />
+      )}
+      {showMusicPicker && (
+        <MusicPicker selectedTrack={selectedTrack} onSelect={handleTrackSelect} onClose={() => setShowMusicPicker(false)} />
       )}
     </div>
   );
