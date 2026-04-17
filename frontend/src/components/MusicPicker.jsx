@@ -70,7 +70,13 @@ function SetupCard({ forIndian, onSaved }) {
 }
 
 export default function MusicPicker({ selectedTrack, onSelect, onClose }) {
-  const [category,  setCategory]  = useState('trending');
+  // Start on a tab that works with the available keys
+  const defaultCat = () => {
+    if (getFreesoundKey()) return 'punjabi';
+    if (getJamendoKey())   return 'trending';
+    return 'all';
+  };
+  const [category,  setCategory]  = useState(defaultCat);
   const [query,     setQuery]     = useState('');
   const [tracks,    setTracks]    = useState([]);
   const [loading,   setLoading]   = useState(false);
@@ -88,18 +94,34 @@ export default function MusicPicker({ selectedTrack, onSelect, onClose }) {
   useEffect(() => () => stopAudio(), [stopAudio]);
 
   const needsFreesound = FREESOUND_CATS.has(category) && !query;
-  const needsJamendo   = !FREESOUND_CATS.has(category) && !query;
-  const missingKey = needsFreesound ? !keys.freesound : !keys.jamendo;
+  // A tab is "missing key" only if NO usable key exists for it:
+  // - 'all' → need at least one key
+  // - Indian cats → need freesound
+  // - Western cats → jamendo preferred, but freesound works as fallback
+  const missingKey = !query && (() => {
+    if (category === 'all') return !keys.jamendo && !keys.freesound;
+    if (FREESOUND_CATS.has(category)) return !keys.freesound;
+    return !keys.jamendo && !keys.freesound; // western: either works
+  })();
 
   const loadTracks = useCallback(async (cat, q) => {
     setLoading(true); setError('');
     try {
       let results;
       if (q.trim()) {
-        // Search: try both if available
         const [j, f] = await Promise.allSettled([
-          keys.jamendo   ? searchJamendoTracks(q)   : Promise.reject(),
-          keys.freesound ? searchFreesoundTracks(q) : Promise.reject(),
+          keys.jamendo   ? searchJamendoTracks(q)   : Promise.reject('no key'),
+          keys.freesound ? searchFreesoundTracks(q) : Promise.reject('no key'),
+        ]);
+        results = [
+          ...(j.status === 'fulfilled' ? j.value : []),
+          ...(f.status === 'fulfilled' ? f.value : []),
+        ];
+      } else if (cat === 'all') {
+        // Fetch from both and combine
+        const [j, f] = await Promise.allSettled([
+          keys.jamendo   ? fetchJamendoTracks('all')   : Promise.reject('no key'),
+          keys.freesound ? fetchFreesoundTracks('all') : Promise.reject('no key'),
         ]);
         results = [
           ...(j.status === 'fulfilled' ? j.value : []),
@@ -107,16 +129,15 @@ export default function MusicPicker({ selectedTrack, onSelect, onClose }) {
         ];
       } else if (FREESOUND_CATS.has(cat)) {
         results = await fetchFreesoundTracks(cat);
-      } else {
+      } else if (keys.jamendo) {
         results = await fetchJamendoTracks(cat);
+      } else {
+        // Fallback: use Freesound with a genre query for Western categories
+        results = await fetchFreesoundTracks(cat);
       }
       setTracks(results);
     } catch (e) {
-      if (e.message === 'NO_KEY' || e.message === 'INVALID_KEY') {
-        setError(e.message === 'INVALID_KEY' ? 'Invalid API key — check your key in Settings.' : '');
-      } else {
-        setError('Could not load tracks. Check your connection.');
-      }
+      setError(e.message === 'INVALID_KEY' ? 'Invalid API key — check Settings.' : 'Could not load tracks.');
     } finally { setLoading(false); }
   }, [keys]);
 
