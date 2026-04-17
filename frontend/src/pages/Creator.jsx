@@ -154,8 +154,8 @@ export default function Creator() {
 
   const totalDuration = script?.scenes?.reduce((sum, s) => sum + (s.duration || 0), 0) || 0;
 
-  // ── Shared configure panel ──────────────────────────────────────────────
-  const ConfigurePanel = () => (
+  // ── Panels as JSX variables (NOT inner components — avoids remount on every keystroke) ──
+  const configurePanel = (
     <div className="space-y-5 pb-4">
       {!hasApiKey && (
         <button
@@ -296,8 +296,7 @@ export default function Creator() {
     </div>
   );
 
-  // ── Shared preview panel ────────────────────────────────────────────────
-  const PreviewPanel = () => (
+  const previewPanel = (
     <div className="space-y-4">
       <VideoPreview script={script} currentScene={currentScene} onSceneChange={setCurrentScene} />
       {isGenerating && (
@@ -332,8 +331,7 @@ export default function Creator() {
     </div>
   );
 
-  // ── Shared scenes panel ─────────────────────────────────────────────────
-  const ScenesPanel = () => (
+  const scenesPanel = (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold text-white/80">Scenes {script ? `(${script.scenes?.length})` : ''}</h2>
@@ -453,7 +451,7 @@ export default function Creator() {
       <div className="hidden lg:flex flex-1 overflow-hidden">
         {/* Left panel */}
         <aside className="w-80 xl:w-96 flex-shrink-0 border-r border-white/5 overflow-y-auto p-5">
-          <ConfigurePanel />
+          {configurePanel}
         </aside>
         {/* Preview */}
         <div className="flex-1 border-r border-white/5 overflow-y-auto p-5">
@@ -467,21 +465,21 @@ export default function Creator() {
                 </div>
               )}
             </div>
-            <PreviewPanel />
+            {previewPanel}
           </div>
         </div>
         {/* Scenes */}
         <div className="w-80 xl:w-96 flex-shrink-0 overflow-y-auto p-5">
-          <ScenesPanel />
+          {scenesPanel}
         </div>
       </div>
 
       {/* ── MOBILE layout (< lg) ─────────────────────────────────────── */}
       <div className="lg:hidden flex-1 overflow-y-auto">
         <div className="p-4 pb-24">
-          {mobileTab === 'configure' && <ConfigurePanel />}
-          {mobileTab === 'preview' && <PreviewPanel />}
-          {mobileTab === 'scenes' && <ScenesPanel />}
+          {mobileTab === 'configure' && configurePanel}
+          {mobileTab === 'preview' && previewPanel}
+          {mobileTab === 'scenes' && scenesPanel}
         </div>
       </div>
 
