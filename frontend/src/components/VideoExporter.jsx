@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { X, Download, Video, Loader2, CheckCircle, AlertCircle, Mic, MicOff, Film } from 'lucide-react';
+import { X, Download, Video, Loader2, CheckCircle, AlertCircle, Mic, MicOff, Film, Sparkles } from 'lucide-react';
 import { fetchElevenLabsAudio, getElevenLabsSettings } from '../services/tts.js';
 import { renderFrame } from '../services/videoRenderer.js';
 import { preloadSceneVideos, getPexelsKey } from '../services/pexels.js';
+import { preloadSceneImages } from '../services/pollinations.js';
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-async function generateVideoBlob(script, onProgress, withAudio, videoEls) {
+async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageEls) {
   const W = 720, H = 405, FPS = 30;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
@@ -57,15 +58,16 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls) {
       }
     }
 
-    // Start background video
+    // Start background video / image
     const bgVideo = videoEls[si] || null;
+    const bgImage = imageEls[si] || null;
     if (bgVideo) { bgVideo.currentTime = 0; bgVideo.play().catch(() => {}); }
 
     // Render frames
     const tsBase = performance.now();
     for (let f = 0; f < frames; f++) {
       const progress = f / frames;
-      renderFrame(ctx, scene, script, si, scenes.length, progress, tsBase + (f / FPS) * 1000, bgVideo);
+      renderFrame(ctx, scene, script, si, scenes.length, progress, tsBase + (f / FPS) * 1000, bgVideo, bgImage);
       const elapsed  = performance.now() - startTime;
       const expected = (f / FPS) * 1000;
       if (expected > elapsed) await sleep(expected - elapsed);
@@ -98,11 +100,17 @@ export default function VideoExporter({ script, onClose }) {
   const handleGenerate = async () => {
     setStatus('generating'); setErrMsg('');
     try {
-      // Load Pexels videos before export
-      const videoEls = pexelsKey
-        ? await preloadSceneVideos(script.scenes, pexelsKey)
-        : {};
-      const { blob } = await generateVideoBlob(script, setProgress, withAudio, videoEls);
+      let videoEls = {}, imageEls = {};
+      if (pexelsKey) {
+        setProgress({ scene: 0, total: script.scenes.length, pct: 0, phase: 'videos' });
+        videoEls = await preloadSceneVideos(script.scenes, pexelsKey);
+      } else {
+        setProgress({ scene: 0, total: script.scenes.length, pct: 0, phase: 'ai-images' });
+        imageEls = await preloadSceneImages(script.scenes, script.style, (done, total) => {
+          setProgress(p => ({ ...p, scene: done, total, pct: (done / total) * 40 }));
+        });
+      }
+      const { blob } = await generateVideoBlob(script, setProgress, withAudio, videoEls, imageEls);
       setVideoUrl(URL.createObjectURL(blob));
       setStatus('done');
     } catch (e) {
@@ -151,8 +159,8 @@ export default function VideoExporter({ script, onClose }) {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-white/50">Background</span>
-                <span className={pexelsKey ? 'text-green-400' : 'text-white/50'}>
-                  {pexelsKey ? '🎬 Stock video (Pexels)' : 'Motion graphics'}
+                <span className={pexelsKey ? 'text-blue-400' : 'text-purple-400'}>
+                  {pexelsKey ? '🎬 Stock video (Pexels)' : '✨ AI-generated images (free)'}
                 </span>
               </div>
             </div>
@@ -194,9 +202,18 @@ export default function VideoExporter({ script, onClose }) {
         {status === 'generating' && (
           <div className="space-y-6 py-4">
             <div className="text-center">
-              <Loader2 className="w-12 h-12 text-brand-400 animate-spin mx-auto mb-4" />
-              <p className="text-lg font-semibold">Rendering Scene {progress.scene} / {progress.total}</p>
-              <p className="text-sm text-white/40 mt-1">Compositing video + text layers...</p>
+              {progress.phase === 'ai-images'
+                ? <Sparkles className="w-12 h-12 text-purple-400 animate-pulse mx-auto mb-4" />
+                : <Loader2 className="w-12 h-12 text-brand-400 animate-spin mx-auto mb-4" />
+              }
+              <p className="text-lg font-semibold">
+                {progress.phase === 'ai-images'
+                  ? `Generating AI visuals… ${progress.scene}/${progress.total}`
+                  : `Rendering Scene ${progress.scene} / ${progress.total}`}
+              </p>
+              <p className="text-sm text-white/40 mt-1">
+                {progress.phase === 'ai-images' ? 'Creating unique images for each scene (free)' : 'Compositing video + text layers…'}
+              </p>
             </div>
             <div className="space-y-2">
               <div className="flex justify-between text-xs text-white/40">

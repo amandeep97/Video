@@ -499,6 +499,19 @@ function detectLayout(scene, sceneIndex, totalScenes) {
   return 'content';
 }
 
+// ── Cinematic vignette overlay (used by both video + image backgrounds) ───────
+function drawVignette(ctx, theme, W, H) {
+  const overlay = ctx.createLinearGradient(0, 0, 0, H);
+  overlay.addColorStop(0,    'rgba(0,0,0,0.62)');
+  overlay.addColorStop(0.35, 'rgba(0,0,0,0.28)');
+  overlay.addColorStop(0.65, 'rgba(0,0,0,0.32)');
+  overlay.addColorStop(1,    'rgba(0,0,0,0.70)');
+  ctx.fillStyle = overlay;
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = rgba(theme.accent, 0.07);
+  ctx.fillRect(0, 0, W, H);
+}
+
 // ── Draw video background with cinematic overlay ─────────────────────────────
 function drawVideoBackground(ctx, bgVideo, theme, W, H) {
   try {
@@ -511,21 +524,32 @@ function drawVideoBackground(ctx, bgVideo, theme, W, H) {
     drawBackground(ctx, theme, W, H, 0);
     return;
   }
-  // Cinematic vignette overlay — dark top/bottom, lighter middle
-  const overlay = ctx.createLinearGradient(0, 0, 0, H);
-  overlay.addColorStop(0,    'rgba(0,0,0,0.60)');
-  overlay.addColorStop(0.35, 'rgba(0,0,0,0.28)');
-  overlay.addColorStop(0.65, 'rgba(0,0,0,0.32)');
-  overlay.addColorStop(1,    'rgba(0,0,0,0.68)');
-  ctx.fillStyle = overlay;
-  ctx.fillRect(0, 0, W, H);
-  // Subtle accent tint
-  ctx.fillStyle = rgba(theme.accent, 0.07);
-  ctx.fillRect(0, 0, W, H);
+  drawVignette(ctx, theme, W, H);
+}
+
+// ── Ken Burns effect: slow zoom + pan on a static AI image ───────────────────
+function drawKenBurns(ctx, img, theme, W, H, progress, sceneIndex) {
+  if (!img || !img.naturalWidth) return;
+  // Alternate zoom direction per scene for variety
+  const zoomIn  = sceneIndex % 2 === 0;
+  const panDir  = (sceneIndex % 3) - 1; // -1, 0, or 1
+  const zoomAmt = 0.08;
+  const zoom    = zoomIn
+    ? lerp(1.0, 1.0 + zoomAmt, easeOut(progress))
+    : lerp(1.0 + zoomAmt, 1.0, easeOut(progress));
+  const panX    = lerp(0, panDir * W * 0.03, progress);
+
+  const base = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+  const s    = base * zoom;
+  try {
+    ctx.drawImage(img, (W - img.naturalWidth * s) / 2 + panX, (H - img.naturalHeight * s) / 2,
+      img.naturalWidth * s, img.naturalHeight * s);
+  } catch { return; }
+  drawVignette(ctx, theme, W, H);
 }
 
 // ── Main public render function ───────────────────────────────────────────────
-export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progress, timestamp, bgVideo = null) {
+export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progress, timestamp, bgVideo = null, bgImage = null) {
   const W = ctx.canvas.width;
   const H = ctx.canvas.height;
   const style = script?.style || 'professional';
@@ -537,12 +561,15 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
 
   const t = timestamp / 1000;
   const p = clamp(progress, 0, 1);
-  const layout = detectLayout(scene, sceneIndex, totalScenes);
+  const layout   = detectLayout(scene, sceneIndex, totalScenes);
   const hasVideo = bgVideo && bgVideo.readyState >= 2;
+  const hasImage = bgImage && bgImage.naturalWidth > 0;
 
-  // Layer 1: background (video or gradient)
+  // Layer 1: background — priority: video > AI image > gradient
   if (hasVideo) {
     drawVideoBackground(ctx, bgVideo, theme, W, H);
+  } else if (hasImage) {
+    drawKenBurns(ctx, bgImage, theme, W, H, p, sceneIndex);
   } else {
     drawBackground(ctx, theme, W, H, t);
     drawParticles(ctx, theme, W, H, t);
