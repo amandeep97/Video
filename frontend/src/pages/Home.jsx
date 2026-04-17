@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Video, Sparkles, Zap, Globe, Mic, Layers, ChevronRight, Play, Star, Key } from 'lucide-react';
 import ApiKeyModal from '../components/ApiKeyModal.jsx';
-import { loadApiKey } from '../services/api.js';
+import { hasValidKey, getSettings, PROVIDERS } from '../services/providers.js';
 
 const EXAMPLE_PROMPTS = [
   'How to start a successful YouTube channel',
@@ -66,7 +66,7 @@ export default function Home() {
               title="Set your Anthropic API key"
             >
               <Key className="w-4 h-4" />
-              <span className="hidden sm:inline">{loadApiKey() ? 'API Key ✓' : 'Set API Key'}</span>
+              <span className="hidden sm:inline">{hasValidKey() ? `⚙ ${PROVIDERS[getSettings().providerId]?.name || 'AI'}` : 'Set API Key'}</span>
             </button>
             <button
               onClick={() => navigate('/create')}

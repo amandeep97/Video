@@ -5,7 +5,8 @@ import {
   Settings2, ChevronDown, ChevronUp, Wand2, FileText,
   Palette, Clock, Users, Mic, AlertCircle, Video, Key
 } from 'lucide-react';
-import { generateScript, regenerateScene, loadApiKey } from '../services/api.js';
+import { generateScript, regenerateScene } from '../services/api.js';
+import { hasValidKey, getSettings, PROVIDERS } from '../services/providers.js';
 import VideoPreview from '../components/VideoPreview.jsx';
 import SceneCard from '../components/SceneCard.jsx';
 import SceneEditor from '../components/SceneEditor.jsx';
@@ -48,20 +49,27 @@ export default function Creator() {
   const [regenerateFeedback, setRegenerateFeedback] = useState('');
   const [feedbackForScene, setFeedbackForScene] = useState(null);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [hasApiKey, setHasApiKey] = useState(!!loadApiKey());
+  const [hasApiKey, setHasApiKey] = useState(hasValidKey());
+
+  const refreshKeyState = () => setHasApiKey(hasValidKey());
+
+  const currentProviderName = () => {
+    const { providerId } = getSettings();
+    return PROVIDERS[providerId]?.name || 'AI';
+  };
 
   // Auto-generate if params provided
   useEffect(() => {
-    if (searchParams.get('topic') && loadApiKey()) {
+    if (searchParams.get('topic') && hasValidKey()) {
       handleGenerate();
-    } else if (searchParams.get('topic') && !loadApiKey()) {
+    } else if (searchParams.get('topic') && !hasValidKey()) {
       setShowApiKeyModal(true);
     }
   }, []);
 
   const handleGenerate = useCallback(async () => {
     if (!topic.trim()) { setError('Please enter a topic'); return; }
-    if (!loadApiKey()) { setShowApiKeyModal(true); return; }
+    if (!hasValidKey()) { setShowApiKeyModal(true); return; }
     setIsGenerating(true);
     setError('');
     setScript(null);
@@ -182,7 +190,7 @@ export default function Creator() {
             title="API Key Settings"
           >
             <Key className="w-4 h-4" />
-            <span className="hidden sm:inline">{hasApiKey ? 'API Key' : 'Set API Key'}</span>
+            <span className="hidden sm:inline">{hasApiKey ? `⚙ ${currentProviderName()}` : 'Set API Key'}</span>
           </button>
         </div>
       </header>
@@ -548,7 +556,7 @@ export default function Creator() {
         <ApiKeyModal
           onClose={() => {
             setShowApiKeyModal(false);
-            setHasApiKey(!!loadApiKey());
+            refreshKeyState();
           }}
         />
       )}
