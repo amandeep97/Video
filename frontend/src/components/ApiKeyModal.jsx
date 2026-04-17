@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { X, Key, Eye, EyeOff, ExternalLink, Shield, Check, ChevronDown, Mic, Film } from 'lucide-react';
+import { X, Key, Eye, EyeOff, ExternalLink, Shield, Check, ChevronDown, Mic, Film, Music } from 'lucide-react';
 import { PROVIDER_LIST, PROVIDERS, getSettings, saveSettings } from '../services/providers.js';
 import { getElevenLabsSettings, saveElevenLabsSettings, ELEVENLABS_VOICES } from '../services/tts.js';
 import { getPexelsKey, savePexelsKey } from '../services/pexels.js';
+import { getJamendoKey, saveJamendoKey } from '../services/jamendo.js';
 
 export default function ApiKeyModal({ onClose }) {
   const current    = getSettings();
@@ -13,12 +14,14 @@ export default function ApiKeyModal({ onClose }) {
   const [apiKey,    setApiKey]   = useState(localStorage.getItem(`ai_key_${current.providerId || 'groq'}`) || '');
   const [show,      setShow]     = useState(false);
   const [saved,     setSaved]    = useState(false);
-  const [activeTab, setActiveTab]= useState('ai'); // 'ai' | 'voice' | 'video'
-  const [elKey,     setElKey]    = useState(elSettings.apiKey);
-  const [elVoice,   setElVoice]  = useState(elSettings.voiceId);
-  const [showEl,    setShowEl]   = useState(false);
-  const [pexelsKey, setPexelsKey]= useState(getPexelsKey());
-  const [showPx,    setShowPx]   = useState(false);
+  const [activeTab,   setActiveTab]  = useState('ai'); // 'ai' | 'voice' | 'video' | 'music'
+  const [elKey,       setElKey]      = useState(elSettings.apiKey);
+  const [elVoice,     setElVoice]    = useState(elSettings.voiceId);
+  const [showEl,      setShowEl]     = useState(false);
+  const [pexelsKey,   setPexelsKey]  = useState(getPexelsKey());
+  const [showPx,      setShowPx]     = useState(false);
+  const [jamendoKey,  setJamendoKey] = useState(getJamendoKey());
+  const [showJm,      setShowJm]     = useState(false);
 
   const provider = PROVIDERS[selectedProvider];
 
@@ -33,6 +36,7 @@ export default function ApiKeyModal({ onClose }) {
     saveSettings({ providerId: selectedProvider, modelId: selectedModel, apiKey: apiKey.trim() });
     saveElevenLabsSettings(elKey.trim(), elVoice);
     savePexelsKey(pexelsKey);
+    saveJamendoKey(jamendoKey);
     setSaved(true);
     setTimeout(() => { setSaved(false); onClose(); }, 700);
   };
@@ -44,7 +48,7 @@ export default function ApiKeyModal({ onClose }) {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h3 className="text-xl font-bold">Settings</h3>
-            <p className="text-sm text-white/40 mt-0.5">AI Provider · Voice · Stock Video</p>
+            <p className="text-sm text-white/40 mt-0.5">AI Provider · Voice · Video · Music</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg glass glass-hover flex items-center justify-center">
             <X className="w-4 h-4" />
@@ -70,8 +74,15 @@ export default function ApiKeyModal({ onClose }) {
             className={`flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-all ${
               activeTab === 'video' ? 'bg-brand-500/30 text-white' : 'text-white/50 hover:text-white'
             }`}>
-            <Film className="w-3.5 h-3.5" /> Stock Video
+            <Film className="w-3.5 h-3.5" /> Video
             {pexelsKey && <span className="w-1.5 h-1.5 rounded-full bg-green-400" />}
+          </button>
+          <button onClick={() => setActiveTab('music')}
+            className={`flex-1 py-2 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-all ${
+              activeTab === 'music' ? 'bg-brand-500/30 text-white' : 'text-white/50 hover:text-white'
+            }`}>
+            <Music className="w-3.5 h-3.5" /> Music
+            {jamendoKey && <span className="w-1.5 h-1.5 rounded-full bg-green-400" />}
           </button>
         </div>
 
@@ -163,6 +174,47 @@ export default function ApiKeyModal({ onClose }) {
               <p className="text-xs text-white/40 leading-relaxed">
                 Key stored only in this browser. Videos fetched directly from Pexels CDN.
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Music tab ───────────────────────────────── */}
+        {activeTab === 'music' && (
+          <div className="space-y-4 mb-4">
+            <div className="flex gap-3 p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl">
+              <Music className="w-4 h-4 text-purple-400 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-white/70 leading-relaxed">
+                <strong className="text-white">Jamendo</strong> gives you a library of 600,000+ royalty-free tracks to browse by mood — like Instagram's music picker.{' '}
+                <span className="text-purple-400">Free to register, free to use.</span>
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm text-white/50">Jamendo Client ID</label>
+                <a href="https://devportal.jamendo.com" target="_blank" rel="noopener noreferrer"
+                  className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">
+                  Get free key <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+              <div className="relative">
+                <input type={showJm ? 'text' : 'password'} value={jamendoKey}
+                  onChange={e => setJamendoKey(e.target.value)}
+                  placeholder="Paste your Jamendo Client ID…" className="input-field pr-10 font-mono text-sm" />
+                <button type="button" onClick={() => setShowJm(s => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white">
+                  {showJm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <div className="p-3 bg-white/5 rounded-xl space-y-1.5">
+              <p className="text-xs text-white/60 font-medium">How to get your free key:</p>
+              <p className="text-xs text-white/40">1. Go to devportal.jamendo.com → Sign up free</p>
+              <p className="text-xs text-white/40">2. Create an app → copy the Client ID</p>
+              <p className="text-xs text-white/40">3. Paste it here → browse 600k+ tracks by mood</p>
+            </div>
+            <div className="flex gap-2 p-3 bg-white/5 rounded-xl">
+              <Shield className="w-4 h-4 text-white/40 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-white/40 leading-relaxed">Key stored only in this browser. Music streams directly from Jamendo's CDN.</p>
             </div>
           </div>
         )}
