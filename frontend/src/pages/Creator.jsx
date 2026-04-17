@@ -3,7 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Sparkles, RefreshCw, Download, Copy, Check,
   Settings2, ChevronDown, ChevronUp, Wand2, FileText,
-  Palette, Clock, Users, Mic, AlertCircle, Video, Key, Play, Layers
+  Palette, Clock, Users, Mic, AlertCircle, Video, Key, Play, Layers,
+  Captions, Music, Smartphone, Monitor, Square
 } from 'lucide-react';
 import { generateScript, regenerateScene } from '../services/api.js';
 import { hasValidKey, getSettings, PROVIDERS } from '../services/providers.js';
@@ -88,6 +89,9 @@ export default function Creator() {
   const [regenerateFeedback, setRegenerateFeedback] = useState('');
   const [copied,             setCopied]             = useState(false);
   const [mobileTab,          setMobileTab]          = useState('configure');
+  const [videoFormat,        setVideoFormat]        = useState('landscape');
+  const [showCaptions,       setShowCaptions]       = useState(true);
+  const [musicStyle,         setMusicStyle]         = useState('none');
 
   // Modal state
   const [showApiKeyModal,    setShowApiKeyModal]    = useState(false);
@@ -212,6 +216,49 @@ export default function Creator() {
         </div>
       </div>
 
+      {/* Video Format */}
+      <div>
+        <label className="text-sm text-white/50 mb-2 block font-medium">Video Format</label>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { id: 'landscape', label: '16:9', sub: 'YouTube', icon: Monitor },
+            { id: 'portrait',  label: '9:16', sub: 'Reels/Shorts', icon: Smartphone },
+            { id: 'square',    label: '1:1',  sub: 'Instagram', icon: Square },
+          ].map(({ id, label, sub, icon: Icon }) => (
+            <button key={id} onClick={() => setVideoFormat(id)}
+              className={`py-2.5 px-2 rounded-xl text-center text-xs transition-all border flex flex-col items-center gap-1 ${
+                videoFormat === id ? 'bg-brand-500/25 border-brand-500/60 text-white' : 'glass border-transparent text-white/50 hover:text-white'
+              }`}>
+              <Icon className="w-4 h-4" />
+              <span className="font-bold">{label}</span>
+              <span className="text-white/30 text-[10px]">{sub}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Captions + Music */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+          showCaptions ? 'bg-brand-500/15 border-brand-500/40' : 'glass border-transparent'
+        }`} onClick={() => setShowCaptions(c => !c)}>
+          <Captions className={`w-4 h-4 ${showCaptions ? 'text-brand-400' : 'text-white/40'}`} />
+          <div>
+            <p className="text-xs font-medium text-white">Captions</p>
+            <p className="text-[10px] text-white/30">{showCaptions ? 'ON' : 'OFF'}</p>
+          </div>
+        </div>
+        <div>
+          <select value={musicStyle} onChange={e => setMusicStyle(e.target.value)}
+            className="input-field text-xs py-2.5 w-full">
+            <option value="none">🔇 No Music</option>
+            <option value="professional">🎵 Calm / Soft</option>
+            <option value="motivational">🔥 Energetic</option>
+            <option value="cinematic">🎬 Cinematic</option>
+          </select>
+        </div>
+      </div>
+
       {/* Voice language */}
       <div>
         <label className="text-sm text-white/50 mb-2 block font-medium flex items-center gap-2">
@@ -332,7 +379,7 @@ export default function Creator() {
   // ── Preview panel ─────────────────────────────────────────────────────────
   const previewPanel = (
     <div className="space-y-4">
-      <VideoPreview script={script} currentScene={currentScene} onSceneChange={setCurrentScene} voiceLang={voiceLang} />
+      <VideoPreview script={script} currentScene={currentScene} onSceneChange={setCurrentScene} voiceLang={voiceLang} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} />
       {isGenerating && (
         <div className="glass rounded-xl p-5 text-center">
           <div className="animate-pulse space-y-3 mb-3">
@@ -541,7 +588,7 @@ export default function Creator() {
         <ApiKeyModal onClose={() => { setShowApiKeyModal(false); refreshKeyState(); }} />
       )}
       {showExporter && script && (
-        <VideoExporter script={script} onClose={() => setShowExporter(false)} />
+        <VideoExporter script={script} onClose={() => setShowExporter(false)} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} />
       )}
     </div>
   );

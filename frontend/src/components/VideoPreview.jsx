@@ -4,12 +4,21 @@ import { speakBrowser, fetchElevenLabsAudio, getElevenLabsSettings } from '../se
 import { renderFrame } from '../services/videoRenderer.js';
 import { preloadSceneVideos, getPexelsKey } from '../services/pexels.js';
 import { preloadSceneImages } from '../services/pollinations.js';
+import { startMusic } from '../services/musicGenerator.js';
 
-export default function VideoPreview({ script, currentScene, onSceneChange, voiceLang = 'en-US' }) {
+export const FORMATS = {
+  landscape: { w: 800, h: 450, aspect: '16/9',  label: '16:9', icon: '📺' },
+  portrait:  { w: 450, h: 800, aspect: '9/16',  label: '9:16', icon: '📱' },
+  square:    { w: 450, h: 450, aspect: '1/1',   label: '1:1',  icon: '⬜' },
+};
+
+export default function VideoPreview({ script, currentScene, onSceneChange, voiceLang = 'en-US', videoFormat = 'landscape', showCaptions = false, musicStyle = 'none' }) {
   const canvasRef     = useRef(null);
   const animFrameRef  = useRef(null);
   const videoEls      = useRef({});
   const imageEls      = useRef({});
+  const musicStopRef  = useRef(null);
+  const musicCtxRef   = useRef(null);
   const [isPlaying,    setIsPlaying]    = useState(false);
   const [isMuted,      setIsMuted]      = useState(false);
   const [sceneProgress,setSceneProgress]= useState(0);
@@ -21,6 +30,7 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
 
   const scene       = script?.scenes?.[currentScene];
   const totalScenes = script?.scenes?.length || 1;
+  const fmt         = FORMATS[videoFormat] || FORMATS.landscape;
 
   // Load backgrounds when script changes
   useEffect(() => {
@@ -28,31 +38,23 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
     videoEls.current = {};
     imageEls.current = {};
     setLoadState({ type: 'idle', done: 0, total: 0 });
-
     const pexelsKey = getPexelsKey();
-
     if (pexelsKey) {
-      // Use Pexels stock videos
       setLoadState({ type: 'video', done: 0, total: script.scenes.length });
       preloadSceneVideos(script.scenes, pexelsKey).then(els => {
         videoEls.current = els;
         setLoadState({ type: 'video', done: script.scenes.length, total: script.scenes.length });
       });
     } else {
-      // Use free Pollinations AI images
       setLoadState({ type: 'ai', done: 0, total: script.scenes.length });
       preloadSceneImages(script.scenes, script.style, (done, total) => {
         setLoadState({ type: 'ai', done, total });
-      }).then(imgs => {
-        imageEls.current = imgs;
-      });
+      }).then(imgs => { imageEls.current = imgs; });
     }
   }, [script]);
 
   useEffect(() => {
-    Object.entries(videoEls.current).forEach(([i, v]) => {
-      if (Number(i) !== currentScene) v.pause();
-    });
+    Object.entries(videoEls.current).forEach(([i, v]) => { if (Number(i) !== currentScene) v.pause(); });
     sceneIndexRef.current = currentScene;
     progressRef.current   = 0;
     setSceneProgress(0);
@@ -62,6 +64,11 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
   const stopSpeech = useCallback(() => {
     if (window.speechSynthesis) window.speechSynthesis.cancel();
     setIsSpeaking(false);
+  }, []);
+
+  const stopMusic = useCallback(() => {
+    if (musicStopRef.current) { musicStopRef.current(); musicStopRef.current = null; }
+    if (musicCtxRef.current)  { musicCtxRef.current.close().catch(() => {}); musicCtxRef.current = null; }
   }, []);
 
   const speakNarration = useCallback(async (text) => {
@@ -91,9 +98,9 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
 
     const draw = (timestamp) => {
       if (!startTimeRef.current) startTimeRef.current = timestamp;
-      const elapsed      = (timestamp - startTimeRef.current) / 1000;
+      const elapsed       = (timestamp - startTimeRef.current) / 1000;
       const sceneDuration = scene?.duration || 15;
-      const progress     = Math.min(elapsed / sceneDuration, 1);
+      const progress      = Math.min(elapsed / sceneDuration, 1);
 
       if (isPlaying) {
         progressRef.current = progress;
@@ -105,6 +112,7 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
           } else {
             setIsPlaying(false);
             stopSpeech();
+            stopMusic();
           }
           startTimeRef.current = null;
           return;
@@ -116,8 +124,7 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
       const bgImage = imageEls.current[sceneIndexRef.current] || null;
 
       if (scene) {
-        renderFrame(ctx, scene, script, sceneIndexRef.current, totalScenes, p, timestamp, bgVideo, bgImage);
-        // Speaking waveform indicator
+        renderFrame(ctx, scene, script, sceneIndexRef.current, totalScenes, p, timestamp, bgVideo, bgImage, { captions: showCaptions });
         if (isSpeaking) {
           const W = canvas.width, H = canvas.height;
           ctx.save();
@@ -138,12 +145,13 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
 
     animFrameRef.current = requestAnimationFrame(draw);
     return () => { if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
-  }, [scene, isPlaying, isSpeaking, script, totalScenes, onSceneChange, stopSpeech, loadState]);
+  }, [scene, isPlaying, isSpeaking, script, totalScenes, onSceneChange, stopSpeech, stopMusic, showCaptions, loadState]);
 
   const handlePlayPause = () => {
     if (isPlaying) {
       setIsPlaying(false);
       stopSpeech();
+      stopMusic();
       videoEls.current[currentScene]?.pause();
     } else {
       setIsPlaying(true);
@@ -151,58 +159,66 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
       const v = videoEls.current[currentScene];
       if (v) { v.currentTime = 0; v.play().catch(() => {}); }
       if (scene?.narration) speakNarration(scene.narration);
+      // Start background music
+      if (musicStyle !== 'none' && !isMuted) {
+        try {
+          const actx = new (window.AudioContext || window.webkitAudioContext)();
+          musicCtxRef.current  = actx;
+          musicStopRef.current = startMusic(actx, musicStyle === 'calm' ? script?.style || 'professional' : musicStyle, actx.destination, 0.12);
+        } catch {}
+      }
     }
   };
 
   const handlePrev = () => {
-    stopSpeech(); setIsPlaying(false);
+    stopSpeech(); stopMusic(); setIsPlaying(false);
     videoEls.current[currentScene]?.pause();
     if (currentScene > 0) onSceneChange(currentScene - 1);
   };
 
   const handleNext = () => {
-    stopSpeech(); setIsPlaying(false);
+    stopSpeech(); stopMusic(); setIsPlaying(false);
     videoEls.current[currentScene]?.pause();
     if (currentScene < totalScenes - 1) onSceneChange(currentScene + 1);
   };
 
   const handleMuteToggle = () => {
     setIsMuted(m => !m);
-    if (!isMuted) stopSpeech();
+    if (!isMuted) { stopSpeech(); stopMusic(); }
   };
 
-  const pct        = loadState.total > 0 ? (loadState.done / loadState.total) * 100 : 0;
-  const isLoading  = loadState.total > 0 && loadState.done < loadState.total;
-  const isAI       = loadState.type === 'ai';
+  const pct       = loadState.total > 0 ? (loadState.done / loadState.total) * 100 : 0;
+  const isLoading = loadState.total > 0 && loadState.done < loadState.total;
+  const isAI      = loadState.type === 'ai';
+
+  // Portrait needs max-height constraint so it doesn't overflow
+  const containerStyle = videoFormat === 'portrait'
+    ? { aspectRatio: fmt.aspect, maxHeight: '70vh', margin: '0 auto' }
+    : { aspectRatio: fmt.aspect };
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="relative rounded-2xl overflow-hidden bg-dark-900 shadow-2xl shadow-black/50" style={{ aspectRatio: '16/9' }}>
-        <canvas ref={canvasRef} width={800} height={450} className="w-full h-full" />
+      <div className="relative rounded-2xl overflow-hidden bg-dark-900 shadow-2xl shadow-black/50" style={containerStyle}>
+        <canvas ref={canvasRef} width={fmt.w} height={fmt.h} className="w-full h-full" />
         {!scene && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-white/30">
             <div className="text-6xl mb-4">🎬</div>
             <p>Generate a script to see preview</p>
           </div>
         )}
-
-        {/* Loading badge */}
         {script && isLoading && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 px-4 py-2 rounded-xl bg-black/70 backdrop-blur-sm">
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 px-4 py-2 rounded-xl bg-black/70 backdrop-blur-sm min-w-[180px]">
             <div className="flex items-center gap-2 text-white text-xs font-medium">
               {isAI
-                ? <><Sparkles className="w-3.5 h-3.5 text-purple-400 animate-pulse" /> Generating AI visuals… {loadState.done}/{loadState.total}</>
-                : <><Film className="w-3.5 h-3.5 text-blue-400 animate-pulse" /> Loading videos… {loadState.done}/{loadState.total}</>
+                ? <><Sparkles className="w-3.5 h-3.5 text-purple-400 animate-pulse" /> AI visuals… {loadState.done}/{loadState.total}</>
+                : <><Film className="w-3.5 h-3.5 text-blue-400 animate-pulse" /> Videos… {loadState.done}/{loadState.total}</>
               }
             </div>
             <div className="w-36 h-1 bg-white/20 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-brand-500 to-purple-500 rounded-full transition-all duration-300"
-                style={{ width: `${pct}%` }} />
+              <div className="h-full bg-gradient-to-r from-brand-500 to-purple-500 rounded-full transition-all duration-300" style={{ width: `${pct}%` }} />
             </div>
           </div>
         )}
-
-        {/* Ready badge */}
         {script && !isLoading && loadState.total > 0 && (
           <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/50 text-xs">
             {isAI
@@ -225,8 +241,7 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
           <SkipForward className="w-5 h-5" />
         </button>
         <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-brand-500 to-purple-500 rounded-full transition-all"
-            style={{ width: `${sceneProgress * 100}%` }} />
+          <div className="h-full bg-gradient-to-r from-brand-500 to-purple-500 rounded-full transition-all" style={{ width: `${sceneProgress * 100}%` }} />
         </div>
         <span className="text-xs text-white/40 font-mono">{currentScene + 1}/{totalScenes}</span>
         <button onClick={handleMuteToggle} className="text-white/50 hover:text-white transition-colors">

@@ -548,8 +548,56 @@ function drawKenBurns(ctx, img, theme, W, H, progress, sceneIndex) {
   drawVignette(ctx, theme, W, H);
 }
 
+// ── Word-by-word captions (CapCut/Reels style) ───────────────────────────────
+function renderCaptions(ctx, narration, progress, W, H) {
+  if (!narration?.trim()) return;
+  const words = narration.trim().split(/\s+/);
+  if (!words.length) return;
+
+  const currentIdx = Math.min(Math.floor(progress * words.length), words.length - 1);
+  const winStart   = Math.max(0, currentIdx - 2);
+  const winEnd     = Math.min(words.length, winStart + 7);
+  const visible    = words.slice(winStart, winEnd);
+  const activeI    = currentIdx - winStart;
+
+  ctx.save();
+  ctx.font = `bold 16px -apple-system, BlinkMacSystemFont, sans-serif`;
+
+  // Measure total width of line
+  const spaceW = ctx.measureText(' ').width;
+  let totalW = visible.reduce((w, word, i) => w + ctx.measureText(word).width + (i < visible.length - 1 ? spaceW : 0), 0);
+  totalW = Math.min(totalW, W - 48);
+
+  const boxH = 38, padX = 14;
+  const boxX = W / 2 - totalW / 2 - padX;
+  const boxY = H - 58;
+  const boxW = totalW + padX * 2;
+
+  // Semi-transparent background pill
+  ctx.fillStyle = 'rgba(0,0,0,0.70)';
+  ctx.beginPath(); ctx.roundRect(boxX, boxY, boxW, boxH, 10); ctx.fill();
+
+  // Draw each word
+  let x = W / 2 - totalW / 2;
+  const y = boxY + boxH / 2;
+  visible.forEach((word, i) => {
+    const active = i === activeI;
+    ctx.font = active
+      ? `bold 16px -apple-system, BlinkMacSystemFont, sans-serif`
+      : `16px -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.fillStyle     = active ? '#ffffff' : 'rgba(255,255,255,0.5)';
+    ctx.textAlign     = 'left';
+    ctx.textBaseline  = 'middle';
+    ctx.shadowColor   = 'rgba(0,0,0,0.9)';
+    ctx.shadowBlur    = 3;
+    ctx.fillText(word, x, y);
+    x += ctx.measureText(word).width + spaceW;
+  });
+  ctx.restore();
+}
+
 // ── Main public render function ───────────────────────────────────────────────
-export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progress, timestamp, bgVideo = null, bgImage = null) {
+export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progress, timestamp, bgVideo = null, bgImage = null, opts = {}) {
   const W = ctx.canvas.width;
   const H = ctx.canvas.height;
   const style = script?.style || 'professional';
@@ -589,7 +637,12 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
   }
   ctx.restore();
 
-  // Layer 4: HUD
+  // Layer 4: captions
+  if (opts.captions && scene?.narration) {
+    renderCaptions(ctx, scene.narration, p, W, H);
+  }
+
+  // Layer 5: HUD
   drawScenePill(ctx, theme, sceneIndex + 1, totalScenes, W, t);
   drawProgressBar(ctx, theme, W, H, p);
 }

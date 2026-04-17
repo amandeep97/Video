@@ -4,11 +4,14 @@ import { fetchElevenLabsAudio, getElevenLabsSettings } from '../services/tts.js'
 import { renderFrame } from '../services/videoRenderer.js';
 import { preloadSceneVideos, getPexelsKey } from '../services/pexels.js';
 import { preloadSceneImages } from '../services/pollinations.js';
+import { startMusic } from '../services/musicGenerator.js';
+import { FORMATS } from './VideoPreview.jsx';
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageEls) {
-  const W = 720, H = 405, FPS = 30;
+async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageEls, opts = {}) {
+  const fmt = FORMATS[opts.format || 'landscape'];
+  const W = fmt.w, H = fmt.h, FPS = 30;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -18,13 +21,17 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageE
   let audioCtx = null, audioDest = null;
 
   const { apiKey: elKey, voiceId } = getElevenLabsSettings();
-  if (withAudio && elKey) {
+  if (withAudio || opts.musicStyle !== 'none') {
     audioCtx  = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
     audioDest = audioCtx.createMediaStreamDestination();
     combinedStream = new MediaStream([
       ...videoStream.getVideoTracks(),
       audioDest.stream.getAudioTracks()[0],
     ]);
+  }
+  // Start background music
+  if (opts.musicStyle && opts.musicStyle !== 'none' && audioCtx && audioDest) {
+    startMusic(audioCtx, opts.musicStyle === 'calm' ? script?.style || 'professional' : opts.musicStyle, audioDest, 0.10);
   }
 
   const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp9', 'video/webm', 'video/mp4']
@@ -67,7 +74,7 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageE
     const tsBase = performance.now();
     for (let f = 0; f < frames; f++) {
       const progress = f / frames;
-      renderFrame(ctx, scene, script, si, scenes.length, progress, tsBase + (f / FPS) * 1000, bgVideo, bgImage);
+      renderFrame(ctx, scene, script, si, scenes.length, progress, tsBase + (f / FPS) * 1000, bgVideo, bgImage, { captions: opts.captions });
       const elapsed  = performance.now() - startTime;
       const expected = (f / FPS) * 1000;
       if (expected > elapsed) await sleep(expected - elapsed);
@@ -88,7 +95,7 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageE
   });
 }
 
-export default function VideoExporter({ script, onClose }) {
+export default function VideoExporter({ script, onClose, videoFormat = 'landscape', showCaptions = false, musicStyle = 'none' }) {
   const [status,    setStatus]   = useState('idle');
   const [progress,  setProgress] = useState({ scene: 0, total: 0, pct: 0 });
   const [videoUrl,  setVideoUrl] = useState('');
@@ -110,7 +117,7 @@ export default function VideoExporter({ script, onClose }) {
           setProgress(p => ({ ...p, scene: done, total, pct: (done / total) * 40 }));
         });
       }
-      const { blob } = await generateVideoBlob(script, setProgress, withAudio, videoEls, imageEls);
+      const { blob } = await generateVideoBlob(script, setProgress, withAudio, videoEls, imageEls, { format: videoFormat, captions: showCaptions, musicStyle });
       setVideoUrl(URL.createObjectURL(blob));
       setStatus('done');
     } catch (e) {
