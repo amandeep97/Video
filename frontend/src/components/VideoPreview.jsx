@@ -12,13 +12,15 @@ export const FORMATS = {
   square:    { w: 450, h: 450, aspect: '1/1',   label: '1:1',  icon: '⬜' },
 };
 
-export default function VideoPreview({ script, currentScene, onSceneChange, voiceLang = 'en-US', videoFormat = 'landscape', showCaptions = false, musicStyle = 'none' }) {
+export default function VideoPreview({ script, currentScene, onSceneChange, voiceLang = 'en-US', videoFormat = 'landscape', showCaptions = false, musicStyle = 'none', customMusicUrl = null }) {
   const canvasRef     = useRef(null);
   const animFrameRef  = useRef(null);
   const videoEls      = useRef({});
   const imageEls      = useRef({});
   const musicStopRef  = useRef(null);
   const musicCtxRef   = useRef(null);
+  const customAudioRef= useRef(null);
+  const musicVolRef   = useRef(0.25);
   const [isPlaying,    setIsPlaying]    = useState(false);
   const [isMuted,      setIsMuted]      = useState(false);
   const [sceneProgress,setSceneProgress]= useState(0);
@@ -69,6 +71,17 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
   const stopMusic = useCallback(() => {
     if (musicStopRef.current) { musicStopRef.current(); musicStopRef.current = null; }
     if (musicCtxRef.current)  { musicCtxRef.current.close().catch(() => {}); musicCtxRef.current = null; }
+    if (customAudioRef.current) { customAudioRef.current.pause(); customAudioRef.current.currentTime = 0; }
+  }, []);
+
+  // Listen for volume slider events from Creator
+  useEffect(() => {
+    const handler = (e) => {
+      musicVolRef.current = e.detail;
+      if (customAudioRef.current) customAudioRef.current.volume = e.detail;
+    };
+    document.addEventListener('music-volume', handler);
+    return () => document.removeEventListener('music-volume', handler);
   }, []);
 
   const speakNarration = useCallback(async (text) => {
@@ -160,12 +173,20 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
       if (v) { v.currentTime = 0; v.play().catch(() => {}); }
       if (scene?.narration) speakNarration(scene.narration);
       // Start background music
-      if (musicStyle !== 'none' && !isMuted) {
-        try {
-          const actx = new (window.AudioContext || window.webkitAudioContext)();
-          musicCtxRef.current  = actx;
-          musicStopRef.current = startMusic(actx, musicStyle === 'calm' ? script?.style || 'professional' : musicStyle, actx.destination, 0.12);
-        } catch {}
+      if (!isMuted) {
+        if (musicStyle === 'custom' && customMusicUrl) {
+          const audio = new Audio(customMusicUrl);
+          audio.loop   = true;
+          audio.volume = musicVolRef.current;
+          audio.play().catch(() => {});
+          customAudioRef.current = audio;
+        } else if (musicStyle !== 'none') {
+          try {
+            const actx = new (window.AudioContext || window.webkitAudioContext)();
+            musicCtxRef.current  = actx;
+            musicStopRef.current = startMusic(actx, musicStyle === 'calm' ? script?.style || 'professional' : musicStyle, actx.destination, 0.12);
+          } catch {}
+        }
       }
     }
   };

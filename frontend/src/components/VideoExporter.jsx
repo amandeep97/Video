@@ -31,7 +31,24 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageE
   }
   // Start background music
   if (opts.musicStyle && opts.musicStyle !== 'none' && audioCtx && audioDest) {
-    startMusic(audioCtx, opts.musicStyle === 'calm' ? script?.style || 'professional' : opts.musicStyle, audioDest, 0.10);
+    if (opts.musicStyle === 'custom' && opts.customMusicUrl) {
+      // Decode uploaded song and loop it
+      try {
+        const res  = await fetch(opts.customMusicUrl);
+        const buf  = await res.arrayBuffer();
+        const decoded = await audioCtx.decodeAudioData(buf);
+        const src  = audioCtx.createBufferSource();
+        const gain = audioCtx.createGain();
+        src.buffer = decoded;
+        src.loop   = true;
+        gain.gain.value = opts.musicVolume || 0.25;
+        src.connect(gain);
+        gain.connect(audioDest);
+        src.start(0);
+      } catch (e) { console.warn('Custom music failed', e.message); }
+    } else {
+      startMusic(audioCtx, opts.musicStyle === 'calm' ? script?.style || 'professional' : opts.musicStyle, audioDest, 0.10);
+    }
   }
 
   const mimeType = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp9', 'video/webm', 'video/mp4']
@@ -95,7 +112,7 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageE
   });
 }
 
-export default function VideoExporter({ script, onClose, videoFormat = 'landscape', showCaptions = false, musicStyle = 'none' }) {
+export default function VideoExporter({ script, onClose, videoFormat = 'landscape', showCaptions = false, musicStyle = 'none', customMusicUrl = null }) {
   const [status,    setStatus]   = useState('idle');
   const [progress,  setProgress] = useState({ scene: 0, total: 0, pct: 0 });
   const [videoUrl,  setVideoUrl] = useState('');
@@ -117,7 +134,7 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
           setProgress(p => ({ ...p, scene: done, total, pct: (done / total) * 40 }));
         });
       }
-      const { blob } = await generateVideoBlob(script, setProgress, withAudio, videoEls, imageEls, { format: videoFormat, captions: showCaptions, musicStyle });
+      const { blob } = await generateVideoBlob(script, setProgress, withAudio, videoEls, imageEls, { format: videoFormat, captions: showCaptions, musicStyle, customMusicUrl });
       setVideoUrl(URL.createObjectURL(blob));
       setStatus('done');
     } catch (e) {

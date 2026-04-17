@@ -92,6 +92,8 @@ export default function Creator() {
   const [videoFormat,        setVideoFormat]        = useState('landscape');
   const [showCaptions,       setShowCaptions]       = useState(true);
   const [musicStyle,         setMusicStyle]         = useState('none');
+  const [customMusicUrl,     setCustomMusicUrl]     = useState(null);
+  const [customMusicName,    setCustomMusicName]    = useState('');
 
   // Modal state
   const [showApiKeyModal,    setShowApiKeyModal]    = useState(false);
@@ -249,15 +251,58 @@ export default function Creator() {
           </div>
         </div>
         <div>
-          <select value={musicStyle} onChange={e => setMusicStyle(e.target.value)}
+          <select value={musicStyle} onChange={e => { setMusicStyle(e.target.value); if (e.target.value !== 'custom') { setCustomMusicUrl(null); setCustomMusicName(''); } }}
             className="input-field text-xs py-2.5 w-full">
             <option value="none">🔇 No Music</option>
             <option value="professional">🎵 Calm / Soft</option>
             <option value="motivational">🔥 Energetic</option>
             <option value="cinematic">🎬 Cinematic</option>
+            <option value="custom">🎶 My Own Song</option>
           </select>
         </div>
       </div>
+
+      {/* Custom music upload */}
+      {musicStyle === 'custom' && (
+        <div className="space-y-2">
+          <label className="block w-full cursor-pointer">
+            <div className={`flex items-center gap-3 p-3 rounded-xl border-2 border-dashed transition-all ${
+              customMusicUrl ? 'border-green-500/50 bg-green-500/10' : 'border-white/20 hover:border-brand-500/50 hover:bg-brand-500/5'
+            }`}>
+              <Music className={`w-5 h-5 flex-shrink-0 ${customMusicUrl ? 'text-green-400' : 'text-white/40'}`} />
+              <div className="flex-1 min-w-0">
+                {customMusicUrl ? (
+                  <>
+                    <p className="text-xs font-medium text-green-400">Song uploaded ✓</p>
+                    <p className="text-xs text-white/40 truncate">{customMusicName}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs font-medium text-white">Upload your song</p>
+                    <p className="text-xs text-white/30">MP3, WAV, OGG supported</p>
+                  </>
+                )}
+              </div>
+              {customMusicUrl && (
+                <button type="button" onClick={e => { e.preventDefault(); URL.revokeObjectURL(customMusicUrl); setCustomMusicUrl(null); setCustomMusicName(''); }}
+                  className="text-white/30 hover:text-red-400 text-xs px-2">✕</button>
+              )}
+            </div>
+            <input type="file" accept="audio/*" className="hidden" onChange={e => {
+              const file = e.target.files[0];
+              if (!file) return;
+              if (customMusicUrl) URL.revokeObjectURL(customMusicUrl);
+              setCustomMusicUrl(URL.createObjectURL(file));
+              setCustomMusicName(file.name);
+            }} />
+          </label>
+          <div className="flex items-center gap-2 px-1">
+            <input type="range" min={0} max={100} defaultValue={25} className="flex-1 accent-brand-500 h-1.5"
+              onChange={e => document.dispatchEvent(new CustomEvent('music-volume', { detail: e.target.value / 100 }))} />
+            <span className="text-xs text-white/30">Vol</span>
+          </div>
+        </div>
+      )}
 
       {/* Voice language */}
       <div>
@@ -379,7 +424,7 @@ export default function Creator() {
   // ── Preview panel ─────────────────────────────────────────────────────────
   const previewPanel = (
     <div className="space-y-4">
-      <VideoPreview script={script} currentScene={currentScene} onSceneChange={setCurrentScene} voiceLang={voiceLang} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} />
+      <VideoPreview script={script} currentScene={currentScene} onSceneChange={setCurrentScene} voiceLang={voiceLang} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} />
       {isGenerating && (
         <div className="glass rounded-xl p-5 text-center">
           <div className="animate-pulse space-y-3 mb-3">
@@ -588,7 +633,7 @@ export default function Creator() {
         <ApiKeyModal onClose={() => { setShowApiKeyModal(false); refreshKeyState(); }} />
       )}
       {showExporter && script && (
-        <VideoExporter script={script} onClose={() => setShowExporter(false)} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} />
+        <VideoExporter script={script} onClose={() => setShowExporter(false)} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} />
       )}
     </div>
   );
