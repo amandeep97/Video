@@ -53,19 +53,32 @@ export async function fetchHuggingFaceTTS(text, langCode = 'en-US') {
   const headers = { 'Content-Type': 'application/json' };
   if (hfToken) headers['Authorization'] = `Bearer ${hfToken}`;
 
-  const res = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ inputs: text }),
-  });
-  if (res.status === 503) throw new Error('Model loading, please try again in 20s');
-  if (res.status === 429) throw new Error('Rate limited — add a HuggingFace token for more requests');
+  // 40s timeout — HuggingFace cold-starts can take 20-30s
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 40000);
+
+  let res;
+  try {
+    res = await fetch(`https://api-inference.huggingface.co/models/${model}`, {
+      method: 'POST', headers,
+      body: JSON.stringify({ inputs: text }),
+      signal: controller.signal,
+    });
+  } catch (e) {
+    clearTimeout(timer);
+    if (e.name === 'AbortError') throw new Error('timeout');
+    throw new Error('network');
+  }
+  clearTimeout(timer);
+
+  if (res.status === 503) throw new Error('loading');
+  if (res.status === 429) throw new Error('ratelimit');
   if (!res.ok) throw new Error(`HF TTS error ${res.status}`);
   // HF sometimes returns JSON error with status 200 — detect and throw
   const ct = res.headers.get('content-type') || '';
   if (ct.includes('json')) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error || 'Model not ready — wait 20s and try again');
+    throw new Error(err?.error || 'loading');
   }
   return await res.blob(); // returns audio/flac
 }

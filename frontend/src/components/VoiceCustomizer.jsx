@@ -115,16 +115,18 @@ export default function VoiceCustomizer({ onClose, voiceLang = 'en-US', onLangCh
     } catch (e) {
       actx?.close().catch(() => {});
       const msg = e.message || '';
-      if (msg.includes('503') || msg.includes('loading') || msg.includes('not ready')) {
-        setTestError('Model loading — wait 20s and tap Test Voice again.');
-      } else if (msg.includes('429') || msg.includes('rate')) {
-        setTestError('Rate limited — add a free HuggingFace token for more requests.');
-      } else if (msg.includes('401') || msg.includes('403') || msg.includes('Invalid token')) {
+      if (msg === 'loading' || msg.includes('503')) {
+        setTestError('Model is starting up — wait 20–30 seconds and tap Test Voice again.');
+      } else if (msg === 'timeout') {
+        setTestError('HuggingFace took too long. The model is loading — wait 30s and try again.');
+      } else if (msg === 'ratelimit' || msg.includes('429')) {
+        setTestError('Too many requests — add a free HuggingFace token to get more.');
+      } else if (msg === 'network' || msg.toLowerCase().includes('load') || msg.toLowerCase().includes('network')) {
+        setTestError('Connection failed. Check your internet and try again.');
+      } else if (msg.includes('401') || msg.includes('403')) {
         setTestError('Invalid token — check your HuggingFace token.');
-      } else if (msg.includes('Load') || msg.includes('decode') || msg.includes('format')) {
-        setTestError('Audio format not supported on this device. Try Device Voice instead.');
       } else {
-        setTestError(`Failed: ${msg || 'Check your internet connection and try again.'}`);
+        setTestError(`Error: ${msg || 'Check your internet connection and try again.'}`);
       }
     }
     setTesting(false);
@@ -318,9 +320,18 @@ export default function VoiceCustomizer({ onClose, voiceLang = 'en-US', onLangCh
               : <><Play className="w-4 h-4" /> Test Voice</>
             }
           </button>
-          {testError && <p className="text-xs text-red-400 text-center px-2">{testError}</p>}
+          {testError && (
+            <div className="space-y-1">
+              <p className="text-xs text-red-400 text-center px-2">{testError}</p>
+              {provider === 'hf' && (
+                <p className="text-[10px] text-yellow-400/70 text-center px-2">
+                  📱 On iPhone? Tap <strong>Device Voice</strong> above — it works great for Hindi &amp; Punjabi with no internet needed.
+                </p>
+              )}
+            </div>
+          )}
           {provider === 'hf' && !testError && (
-            <p className="text-[10px] text-white/30 text-center">First test may take ~20s while model loads</p>
+            <p className="text-[10px] text-white/30 text-center">First test takes ~20–30s while model loads on HuggingFace</p>
           )}
         </div>
       </div>
