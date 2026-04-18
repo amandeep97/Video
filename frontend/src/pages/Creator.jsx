@@ -741,7 +741,7 @@ export default function Creator() {
         <MusicPicker selectedTrack={selectedTrack} onSelect={handleTrackSelect} onClose={() => setShowMusicPicker(false)} />
       )}
       {showVoiceCustomizer && (
-        <VoiceCustomizer voiceLang={voiceLang} onClose={() => setShowVoiceCustomizer(false)} />
+        <VoiceCustomizer voiceLang={voiceLang} onClose={() => setShowVoiceCustomizer(false)} onLangChange={lang => { setVoiceLang(lang); saveVoiceLang(lang); }} />
       )}
     </div>
   );
