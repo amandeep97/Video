@@ -25,12 +25,11 @@ const SAMPLE_TEXTS = {
 
 const HF_LANGS = ['hi-IN', 'pa-IN', 'en-US', 'en-GB', 'es-ES', 'fr-FR', 'de-DE', 'ar-SA', 'ja-JP', 'zh-CN', 'ko-KR', 'pt-BR'];
 
-// Play audio blob — tries AudioContext first, falls back to <audio> for iOS FLAC
-async function playAudioBlob(blob, onEnd) {
-  // Try AudioContext (Chrome, Firefox, modern Safari)
+// Play audio blob — accepts a pre-unlocked AudioContext (required for iOS)
+async function playAudioBlob(blob, actx, onEnd) {
+  // Try AudioContext decode (Chrome, Firefox, modern Safari)
   try {
     const arrayBuf = await blob.arrayBuffer();
-    const actx = new (window.AudioContext || window.webkitAudioContext)();
     const decoded = await actx.decodeAudioData(arrayBuf);
     const src = actx.createBufferSource();
     src.buffer = decoded;
@@ -39,16 +38,17 @@ async function playAudioBlob(blob, onEnd) {
     src.start(0);
     return () => { try { src.stop(); } catch {} actx.close(); };
   } catch {
-    // Fallback: <audio> element (iOS Safari handles FLAC natively in <audio>)
-    const url = URL.createObjectURL(blob);
-    const audio = document.createElement('audio');
-    audio.src = url;
-    audio.onended  = () => { URL.revokeObjectURL(url); onEnd?.(); };
-    audio.onerror  = () => { URL.revokeObjectURL(url); onEnd?.(); };
-    document.body.appendChild(audio);
-    await audio.play();
-    return () => { audio.pause(); URL.revokeObjectURL(url); audio.remove(); };
+    actx.close().catch(() => {});
   }
+  // Fallback: native <audio> element (handles FLAC on iOS Safari)
+  const url = URL.createObjectURL(blob);
+  const audio = document.createElement('audio');
+  audio.src = url;
+  document.body.appendChild(audio);
+  audio.onended = () => { URL.revokeObjectURL(url); audio.remove(); onEnd?.(); };
+  audio.onerror = () => { URL.revokeObjectURL(url); audio.remove(); onEnd?.(); };
+  audio.play().catch(() => onEnd?.());
+  return () => { audio.pause(); URL.revokeObjectURL(url); try { audio.remove(); } catch {} };
 }
 
 export default function VoiceCustomizer({ onClose, voiceLang = 'en-US', onLangChange }) {
@@ -84,10 +84,25 @@ export default function VoiceCustomizer({ onClose, voiceLang = 'en-US', onLangCh
     if (stopAudioRef.current) { stopAudioRef.current(); stopAudioRef.current = null; }
     window.speechSynthesis?.cancel();
 
+    // ── iOS audio unlock: create & resume AudioContext synchronously
+    // before any await, so iOS Safari doesn't block playback ──────────
+    let actx = null;
+    if (provider === 'hf') {
+      try {
+        actx = new (window.AudioContext || window.webkitAudioContext)();
+        // play a silent 1-sample buffer to fully unlock iOS audio session
+        const silent = actx.createBuffer(1, 1, 22050);
+        const silSrc = actx.createBufferSource();
+        silSrc.buffer = silent;
+        silSrc.connect(actx.destination);
+        silSrc.start(0);
+      } catch {}
+    }
+
     try {
       if (provider === 'hf') {
         const blob = await fetchHuggingFaceTTS(sampleText, selectedLang);
-        stopAudioRef.current = await playAudioBlob(blob, () => setTesting(false));
+        stopAudioRef.current = await playAudioBlob(blob, actx, () => setTesting(false));
         return;
       }
       if (provider === 'browser') {
@@ -98,15 +113,18 @@ export default function VoiceCustomizer({ onClose, voiceLang = 'en-US', onLangCh
       // ElevenLabs — just inform user
       setTestError('ElevenLabs preview: press Play in the video preview.');
     } catch (e) {
+      actx?.close().catch(() => {});
       const msg = e.message || '';
-      if (msg.includes('503') || msg.includes('loading')) {
-        setTestError('Model loading on HuggingFace servers — wait 20s and try again.');
+      if (msg.includes('503') || msg.includes('loading') || msg.includes('not ready')) {
+        setTestError('Model loading — wait 20s and tap Test Voice again.');
       } else if (msg.includes('429') || msg.includes('rate')) {
         setTestError('Rate limited — add a free HuggingFace token for more requests.');
-      } else if (msg.includes('401') || msg.includes('403')) {
+      } else if (msg.includes('401') || msg.includes('403') || msg.includes('Invalid token')) {
         setTestError('Invalid token — check your HuggingFace token.');
+      } else if (msg.includes('Load') || msg.includes('decode') || msg.includes('format')) {
+        setTestError('Audio format not supported on this device. Try Device Voice instead.');
       } else {
-        setTestError(`Error: ${msg || 'Could not load voice. Check your connection.'}`);
+        setTestError(`Failed: ${msg || 'Check your internet connection and try again.'}`);
       }
     }
     setTesting(false);
