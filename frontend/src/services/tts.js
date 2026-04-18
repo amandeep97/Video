@@ -59,7 +59,14 @@ export async function fetchHuggingFaceTTS(text, langCode = 'en-US') {
     body: JSON.stringify({ inputs: text }),
   });
   if (res.status === 503) throw new Error('Model loading, please try again in 20s');
+  if (res.status === 429) throw new Error('Rate limited — add a HuggingFace token for more requests');
   if (!res.ok) throw new Error(`HF TTS error ${res.status}`);
+  // HF sometimes returns JSON error with status 200 — detect and throw
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('json')) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error || 'Model not ready — wait 20s and try again');
+  }
   return await res.blob(); // returns audio/flac
 }
 

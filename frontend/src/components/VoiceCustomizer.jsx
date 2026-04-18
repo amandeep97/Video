@@ -25,17 +25,30 @@ const SAMPLE_TEXTS = {
 
 const HF_LANGS = ['hi-IN', 'pa-IN', 'en-US', 'en-GB', 'es-ES', 'fr-FR', 'de-DE', 'ar-SA', 'ja-JP', 'zh-CN', 'ko-KR', 'pt-BR'];
 
-// Play audio blob via AudioContext (handles FLAC/WAV on all devices)
+// Play audio blob — tries AudioContext first, falls back to <audio> for iOS FLAC
 async function playAudioBlob(blob, onEnd) {
-  const arrayBuf = await blob.arrayBuffer();
-  const actx = new (window.AudioContext || window.webkitAudioContext)();
-  const decoded = await actx.decodeAudioData(arrayBuf);
-  const src = actx.createBufferSource();
-  src.buffer = decoded;
-  src.connect(actx.destination);
-  src.onended = () => { actx.close(); onEnd?.(); };
-  src.start(0);
-  return () => { src.stop(); actx.close(); };
+  // Try AudioContext (Chrome, Firefox, modern Safari)
+  try {
+    const arrayBuf = await blob.arrayBuffer();
+    const actx = new (window.AudioContext || window.webkitAudioContext)();
+    const decoded = await actx.decodeAudioData(arrayBuf);
+    const src = actx.createBufferSource();
+    src.buffer = decoded;
+    src.connect(actx.destination);
+    src.onended = () => { actx.close(); onEnd?.(); };
+    src.start(0);
+    return () => { try { src.stop(); } catch {} actx.close(); };
+  } catch {
+    // Fallback: <audio> element (iOS Safari handles FLAC natively in <audio>)
+    const url = URL.createObjectURL(blob);
+    const audio = document.createElement('audio');
+    audio.src = url;
+    audio.onended  = () => { URL.revokeObjectURL(url); onEnd?.(); };
+    audio.onerror  = () => { URL.revokeObjectURL(url); onEnd?.(); };
+    document.body.appendChild(audio);
+    await audio.play();
+    return () => { audio.pause(); URL.revokeObjectURL(url); audio.remove(); };
+  }
 }
 
 export default function VoiceCustomizer({ onClose, voiceLang = 'en-US', onLangChange }) {
