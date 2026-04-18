@@ -226,11 +226,31 @@ export default function Creator() {
           <Clock className="w-4 h-4" />
           Duration: <span className="text-white">{duration}s ({Math.floor(duration / 60)}:{String(duration % 60).padStart(2, '0')})</span>
         </label>
-        <input type="range" min={30} max={180} step={15} value={duration}
+        {/* Quick presets */}
+        <div className="grid grid-cols-5 gap-1.5 mb-3">
+          {[
+            { label: '15s',  val: 15,  hint: 'Story' },
+            { label: '30s',  val: 30,  hint: 'Reel' },
+            { label: '60s',  val: 60,  hint: '1 min' },
+            { label: '90s',  val: 90,  hint: '1.5m' },
+            { label: '3min', val: 180, hint: 'Long' },
+          ].map(p => (
+            <button key={p.val} onClick={() => setDuration(p.val)}
+              className={`flex flex-col items-center py-2 rounded-xl text-xs font-medium transition-all border ${
+                duration === p.val
+                  ? 'bg-brand-500/25 border-brand-500/60 text-white'
+                  : 'glass border-transparent text-white/50 hover:text-white'
+              }`}>
+              <span className="font-bold">{p.label}</span>
+              <span className="text-[9px] opacity-60 mt-0.5">{p.hint}</span>
+            </button>
+          ))}
+        </div>
+        <input type="range" min={15} max={180} step={15} value={duration}
           onChange={e => setDuration(Number(e.target.value))}
           className="w-full accent-brand-500 h-2" />
         <div className="flex justify-between text-xs text-white/30 mt-1">
-          <span>30s</span><span>1min</span><span>2min</span><span>3min</span>
+          <span>15s</span><span>1min</span><span>2min</span><span>3min</span>
         </div>
       </div>
 
