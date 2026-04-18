@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Sparkles, Film } from 'lucide-react';
-import { speakBrowser, fetchElevenLabsAudio, getElevenLabsSettings } from '../services/tts.js';
+import { speakBrowser, getElevenLabsSettings, getAudioBlob } from '../services/tts.js';
 import { renderFrame } from '../services/videoRenderer.js';
 import { preloadSceneVideos, getPexelsKey } from '../services/pexels.js';
 import { preloadSceneImages } from '../services/pollinations.js';
@@ -87,18 +87,17 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
   const speakNarration = useCallback(async (text) => {
     if (isMuted) return;
     stopSpeech();
-    const { apiKey: elKey, voiceId } = getElevenLabsSettings();
-    if (elKey) {
-      try {
-        const blob  = await fetchElevenLabsAudio(text, elKey, voiceId);
+    try {
+      const blob = await getAudioBlob(text, voiceLang);
+      if (blob) {
         const url   = URL.createObjectURL(blob);
         const audio = new Audio(url);
         audio.onplay  = () => setIsSpeaking(true);
         audio.onended = () => { setIsSpeaking(false); URL.revokeObjectURL(url); };
         audio.play();
         return;
-      } catch (e) { console.warn('ElevenLabs failed', e.message); }
-    }
+      }
+    } catch (e) { console.warn('AI TTS failed, using browser voice:', e.message); }
     setIsSpeaking(true);
     await speakBrowser(text, voiceLang, () => setIsSpeaking(false));
   }, [isMuted, stopSpeech, voiceLang]);

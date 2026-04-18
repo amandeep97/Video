@@ -15,6 +15,7 @@ import SceneEditor from '../components/SceneEditor.jsx';
 import ApiKeyModal from '../components/ApiKeyModal.jsx';
 import VideoExporter from '../components/VideoExporter.jsx';
 import MusicPicker from '../components/MusicPicker.jsx';
+import VoiceCustomizer from '../components/VoiceCustomizer.jsx';
 
 // ── Stable components defined OUTSIDE Creator to prevent remount on re-render ──
 
@@ -96,7 +97,8 @@ export default function Creator() {
   const [customMusicUrl,     setCustomMusicUrl]     = useState(null);
   const [customMusicName,    setCustomMusicName]    = useState('');
   const [selectedTrack,      setSelectedTrack]      = useState(null);
-  const [showMusicPicker,    setShowMusicPicker]    = useState(false);
+  const [showMusicPicker,      setShowMusicPicker]      = useState(false);
+  const [showVoiceCustomizer,  setShowVoiceCustomizer]  = useState(false);
 
   // Modal state
   const [showApiKeyModal,    setShowApiKeyModal]    = useState(false);
@@ -402,11 +404,17 @@ export default function Creator() {
         )}
       </div>
 
-      {/* Voice language */}
+      {/* Voice language + customizer */}
       <div>
-        <label className="text-sm text-white/50 mb-2 block font-medium flex items-center gap-2">
-          <Mic className="w-4 h-4" /> Voice Language
-        </label>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-sm text-white/50 font-medium flex items-center gap-2">
+            <Mic className="w-4 h-4" /> Voice Language
+          </label>
+          <button onClick={() => setShowVoiceCustomizer(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand-500/20 border border-brand-500/40 text-xs font-medium text-brand-300 hover:bg-brand-500/30 transition-all">
+            🎙️ Customize Voice
+          </button>
+        </div>
         <div className="grid grid-cols-3 gap-1.5">
           {VOICE_LANGUAGES.map(l => (
             <button key={l.id} onClick={() => { setVoiceLang(l.id); saveVoiceLang(l.id); }}
@@ -420,13 +428,9 @@ export default function Creator() {
             </button>
           ))}
         </div>
-        {!getElevenLabsSettings().apiKey && (
-          <p className="text-xs text-white/30 mt-2 flex items-center gap-1">
-            <span>Add ElevenLabs key in</span>
-            <button onClick={() => setShowApiKeyModal(true)} className="text-brand-400 underline">Settings</button>
-            <span>for realistic voices</span>
-          </p>
-        )}
+        <p className="text-xs text-white/30 mt-2">
+          🤗 <button onClick={() => setShowVoiceCustomizer(true)} className="text-brand-400 underline">Use free HuggingFace AI voice</button> — unlimited Hindi, Punjabi, English &amp; more
+        </p>
       </div>
 
       {/* Advanced */}
@@ -731,10 +735,13 @@ export default function Creator() {
         <ApiKeyModal onClose={() => { setShowApiKeyModal(false); refreshKeyState(); }} />
       )}
       {showExporter && script && (
-        <VideoExporter script={script} onClose={() => setShowExporter(false)} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} />
+        <VideoExporter script={script} onClose={() => setShowExporter(false)} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} voiceLang={voiceLang} />
       )}
       {showMusicPicker && (
         <MusicPicker selectedTrack={selectedTrack} onSelect={handleTrackSelect} onClose={() => setShowMusicPicker(false)} />
+      )}
+      {showVoiceCustomizer && (
+        <VoiceCustomizer voiceLang={voiceLang} onClose={() => setShowVoiceCustomizer(false)} />
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X, Download, Video, Loader2, CheckCircle, AlertCircle, Mic, MicOff, Film, Sparkles } from 'lucide-react';
-import { fetchElevenLabsAudio, getElevenLabsSettings } from '../services/tts.js';
+import { getAudioBlob, getElevenLabsSettings, getVoiceSettings } from '../services/tts.js';
 import { renderFrame } from '../services/videoRenderer.js';
 import { preloadSceneVideos, getPexelsKey } from '../services/pexels.js';
 import { preloadSceneImages } from '../services/pollinations.js';
@@ -20,7 +20,7 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageE
   let combinedStream = videoStream;
   let audioCtx = null, audioDest = null;
 
-  const { apiKey: elKey, voiceId } = getElevenLabsSettings();
+  const { apiKey: elKey, voiceId } = getElevenLabsSettings(); // eslint-disable-line no-unused-vars
   if (withAudio || opts.musicStyle !== 'none') {
     audioCtx  = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 44100 });
     audioDest = audioCtx.createMediaStreamDestination();
@@ -73,10 +73,11 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageE
     const startTime  = performance.now();
     onProgress({ scene: si + 1, total: scenes.length, phase: 'rendering', pct: (si / scenes.length) * 100 });
 
-    // Audio
-    if (withAudio && elKey && audioDest && audioCtx) {
+    // Audio — uses HuggingFace / ElevenLabs / browser based on voice settings
+    if (withAudio && audioDest && audioCtx) {
       try {
-        const blob     = await fetchElevenLabsAudio(scene.narration, elKey, voiceId);
+        const blob     = await getAudioBlob(scene.narration, opts.voiceLang || 'en-US');
+        if (!blob) throw new Error('no blob');
         const arrayBuf = await blob.arrayBuffer();
         const decoded  = await audioCtx.decodeAudioData(arrayBuf);
         const src      = audioCtx.createBufferSource();
@@ -119,15 +120,16 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageE
   });
 }
 
-export default function VideoExporter({ script, onClose, videoFormat = 'landscape', showCaptions = false, musicStyle = 'none', customMusicUrl = null }) {
+export default function VideoExporter({ script, onClose, videoFormat = 'landscape', showCaptions = false, musicStyle = 'none', customMusicUrl = null, voiceLang = 'en-US' }) {
   const [status,    setStatus]   = useState('idle');
   const [progress,  setProgress] = useState({ scene: 0, total: 0, pct: 0 });
   const [videoUrl,  setVideoUrl] = useState('');
   const [videoMime, setVideoMime]= useState('');
-  const [withAudio, setWithAudio]= useState(!!getElevenLabsSettings().apiKey);
+  const [withAudio, setWithAudio]= useState(true);
   const [errMsg,    setErrMsg]   = useState('');
   const { apiKey: elKey } = getElevenLabsSettings();
   const pexelsKey = getPexelsKey();
+  const { provider: voiceProvider } = getVoiceSettings();
 
   const handleGenerate = async () => {
     setStatus('generating'); setErrMsg('');
@@ -142,7 +144,7 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
           setProgress(p => ({ ...p, scene: done, total, pct: (done / total) * 40 }));
         });
       }
-      const { blob, mimeType } = await generateVideoBlob(script, setProgress, withAudio, videoEls, imageEls, { format: videoFormat, captions: showCaptions, musicStyle, customMusicUrl });
+      const { blob, mimeType } = await generateVideoBlob(script, setProgress, withAudio, videoEls, imageEls, { format: videoFormat, captions: showCaptions, musicStyle, customMusicUrl, voiceLang });
       setVideoUrl(URL.createObjectURL(blob));
       setVideoMime(mimeType);
       setStatus('done');
@@ -210,21 +212,21 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
 
             {/* Audio toggle */}
             <div className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
-              withAudio && elKey ? 'bg-green-500/10 border-green-500/30' : 'glass border-white/10'
+              withAudio ? 'bg-green-500/10 border-green-500/30' : 'glass border-white/10'
             }`}>
               <div className="flex items-center gap-3">
-                {withAudio && elKey ? <Mic className="w-5 h-5 text-green-400" /> : <MicOff className="w-5 h-5 text-white/40" />}
+                {withAudio ? <Mic className="w-5 h-5 text-green-400" /> : <MicOff className="w-5 h-5 text-white/40" />}
                 <div>
-                  <p className="text-sm font-medium">{elKey ? 'AI Voice Narration' : 'Silent Video'}</p>
-                  <p className="text-xs text-white/40">{elKey ? 'ElevenLabs voice mixed in' : 'Add ElevenLabs key in Settings'}</p>
+                  <p className="text-sm font-medium">AI Voice Narration</p>
+                  <p className="text-xs text-white/40">
+                    {voiceProvider === 'hf' ? '🤗 HuggingFace AI (free, unlimited)' : voiceProvider === 'elevenlabs' ? '🎙️ ElevenLabs' : '📱 Device voice'}
+                  </p>
                 </div>
               </div>
-              {elKey && (
-                <button onClick={() => setWithAudio(a => !a)}
-                  className={`w-12 h-6 rounded-full transition-all ${withAudio ? 'bg-green-500' : 'bg-white/20'}`}>
-                  <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${withAudio ? 'translate-x-6' : 'translate-x-0.5'}`} />
-                </button>
-              )}
+              <button onClick={() => setWithAudio(a => !a)}
+                className={`w-12 h-6 rounded-full transition-all ${withAudio ? 'bg-green-500' : 'bg-white/20'}`}>
+                <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${withAudio ? 'translate-x-6' : 'translate-x-0.5'}`} />
+              </button>
             </div>
 
             <p className="text-xs text-white/30 text-center">Export runs in real-time — keep this tab open.</p>
