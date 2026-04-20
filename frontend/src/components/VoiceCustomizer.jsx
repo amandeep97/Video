@@ -158,9 +158,9 @@ export default function VoiceCustomizer({ onClose, voiceLang = 'en-US', onLangCh
         {/* Provider selector */}
         <div className="grid grid-cols-3 gap-2">
           {[
-            { id: 'hf',         icon: '🤗', title: 'HuggingFace AI', sub: 'Free · Hindi · Punjabi', color: 'from-yellow-500/20 to-orange-500/20', border: 'border-yellow-500/40' },
-            { id: 'browser',    icon: '📱', title: 'Device Voice',   sub: 'Unlimited · On-device',  color: 'from-blue-500/20 to-cyan-500/20',    border: 'border-blue-500/40' },
-            { id: 'elevenlabs', icon: '🎙️', title: 'ElevenLabs',    sub: 'Premium · Realistic',    color: 'from-purple-500/20 to-pink-500/20',  border: 'border-purple-500/40' },
+            { id: 'hf',         icon: '🤗', title: 'HuggingFace AI', sub: 'Free AI · Hindi · Punjabi', color: 'from-yellow-500/20 to-orange-500/20', border: 'border-yellow-500/40' },
+            { id: 'browser',    icon: '📱', title: 'Device Voice',   sub: '✅ Best for iPhone',         color: 'from-blue-500/20 to-cyan-500/20',    border: 'border-blue-500/40' },
+            { id: 'elevenlabs', icon: '🎙️', title: 'ElevenLabs',    sub: 'Premium · Realistic',        color: 'from-purple-500/20 to-pink-500/20',  border: 'border-purple-500/40' },
           ].map(p => (
             <button key={p.id} onClick={() => setProvider(p.id)}
               className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
@@ -179,24 +179,28 @@ export default function VoiceCustomizer({ onClose, voiceLang = 'en-US', onLangCh
         {/* HuggingFace settings */}
         {provider === 'hf' && (
           <div className="space-y-3">
-            <div className="flex gap-3 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
-              <span className="text-lg flex-shrink-0">🤗</span>
-              <p className="text-xs text-white/70 leading-relaxed">
-                <strong className="text-white">HuggingFace MMS</strong> — Meta's free AI TTS. Tap a language below to select it, then tap Test Voice.
-              </p>
+            <div className="space-y-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+              <p className="text-xs text-white/80 font-semibold">🤗 HuggingFace AI — Setup Steps</p>
+              <ol className="text-xs text-white/60 space-y-1 list-none">
+                <li>1️⃣ Go to <strong className="text-white">huggingface.co</strong> → Sign up free</li>
+                <li>2️⃣ Settings → Access Tokens → <strong className="text-white">New Token</strong> (type: Read)</li>
+                <li>3️⃣ Copy the token (starts with <code className="text-yellow-300">hf_</code>)</li>
+                <li>4️⃣ Paste it in the field below, then Test Voice</li>
+              </ol>
+              <p className="text-[10px] text-yellow-400/60">Token fixes "Connection failed" errors on iPhone</p>
             </div>
 
-            {/* Optional token */}
+            {/* Token field */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs text-white/50">Token (optional — for higher limits)</label>
+                <label className="text-xs text-white/50">HuggingFace Token <span className="text-yellow-400">*required on iPhone</span></label>
                 <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener noreferrer"
                   className="text-xs text-brand-400 flex items-center gap-1">
                   Get free <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
               <input type="text" value={hfToken} onChange={e => setHfToken(e.target.value)}
-                placeholder="hf_... (leave blank to use without token)"
+                placeholder="hf_xxxxxxxxxxxxxxxxxxxx"
                 className="input-field text-xs font-mono" />
             </div>
 
@@ -233,6 +237,15 @@ export default function VoiceCustomizer({ onClose, voiceLang = 'en-US', onLangCh
         {/* Browser voice settings */}
         {provider === 'browser' && (
           <div className="space-y-3">
+            <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl space-y-1.5">
+              <p className="text-xs text-white/80 font-semibold">📱 Add Hindi/Punjabi on iPhone</p>
+              <ol className="text-xs text-white/60 space-y-1 list-none">
+                <li>1️⃣ iPhone <strong className="text-white">Settings</strong> → Accessibility</li>
+                <li>2️⃣ <strong className="text-white">Spoken Content</strong> → Voices</li>
+                <li>3️⃣ Tap <strong className="text-white">Hindi</strong> or <strong className="text-white">Punjabi</strong> → download a voice</li>
+                <li>4️⃣ Come back here and select it below</li>
+              </ol>
+            </div>
             <div>
               <label className="text-xs text-white/50 mb-2 block">Filter by Language</label>
               <div className="flex gap-1.5 flex-wrap">
