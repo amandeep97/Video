@@ -3,8 +3,8 @@ import { X, Play, Loader2, Check, Mic, ExternalLink } from 'lucide-react';
 import {
   VOICE_LANGUAGES,
   getVoiceSettings, saveVoiceSettings,
-  getElevenLabsSettings, saveElevenLabsSettings,
-  fetchHuggingFaceTTS, speakBrowser,
+  getElevenLabsSettings,
+  fetchHuggingFaceTTS, fetchCloudTTS, speakBrowser,
   getAllVoices, saveVoiceLang,
 } from '../services/tts.js';
 
@@ -100,6 +100,11 @@ export default function VoiceCustomizer({ onClose, voiceLang = 'en-US', onLangCh
     }
 
     try {
+      if (provider === 'cloud') {
+        const blob = await fetchCloudTTS(sampleText, selectedLang);
+        stopAudioRef.current = await playAudioBlob(blob, actx, () => setTesting(false));
+        return;
+      }
       if (provider === 'hf') {
         const blob = await fetchHuggingFaceTTS(sampleText, selectedLang);
         stopAudioRef.current = await playAudioBlob(blob, actx, () => setTesting(false));
@@ -156,18 +161,20 @@ export default function VoiceCustomizer({ onClose, voiceLang = 'en-US', onLangCh
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
 
         {/* Provider selector */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           {[
-            { id: 'hf',         icon: '🤗', title: 'HuggingFace AI', sub: 'Free AI · Hindi · Punjabi', color: 'from-yellow-500/20 to-orange-500/20', border: 'border-yellow-500/40' },
-            { id: 'browser',    icon: '📱', title: 'Device Voice',   sub: '✅ Best for iPhone',         color: 'from-blue-500/20 to-cyan-500/20',    border: 'border-blue-500/40' },
-            { id: 'elevenlabs', icon: '🎙️', title: 'ElevenLabs',    sub: 'Premium · Realistic',        color: 'from-purple-500/20 to-pink-500/20',  border: 'border-purple-500/40' },
+            { id: 'cloud',      icon: '☁️', title: 'Cloud Voice',    sub: '✅ Free · iPhone · Hindi',   color: 'from-green-500/20 to-teal-500/20',   border: 'border-green-500/40',  badge: 'RECOMMENDED' },
+            { id: 'elevenlabs', icon: '🎙️', title: 'ElevenLabs',    sub: 'Best quality · Free tier',   color: 'from-purple-500/20 to-pink-500/20',  border: 'border-purple-500/40', badge: null },
+            { id: 'browser',    icon: '📱', title: 'Device Voice',   sub: 'On-device · No internet',    color: 'from-blue-500/20 to-cyan-500/20',    border: 'border-blue-500/40',   badge: null },
+            { id: 'hf',         icon: '🤗', title: 'HuggingFace',   sub: 'AI · needs token + wifi',    color: 'from-yellow-500/20 to-orange-500/20',border: 'border-yellow-500/40', badge: null },
           ].map(p => (
             <button key={p.id} onClick={() => setProvider(p.id)}
-              className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
+              className={`relative flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
                 provider === p.id
                   ? `bg-gradient-to-br ${p.color} ${p.border}`
                   : 'glass border-white/10 hover:border-white/20'
               }`}>
+              {p.badge && <span className="absolute top-1.5 right-1.5 text-[8px] bg-green-500 text-white px-1.5 py-0.5 rounded-full font-bold">{p.badge}</span>}
               <span className="text-2xl">{p.icon}</span>
               <p className="text-xs font-semibold text-white leading-tight text-center">{p.title}</p>
               <p className="text-[9px] text-white/40 text-center leading-tight">{p.sub}</p>
@@ -175,6 +182,17 @@ export default function VoiceCustomizer({ onClose, voiceLang = 'en-US', onLangCh
             </button>
           ))}
         </div>
+
+        {/* Cloud Voice info */}
+        {provider === 'cloud' && (
+          <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-xl space-y-1.5">
+            <p className="text-xs text-white/80 font-semibold">☁️ Cloud Voice — Free, works on iPhone</p>
+            <p className="text-xs text-white/60 leading-relaxed">
+              Uses Amazon Polly voices via StreamElements. <strong className="text-white">No sign-up needed.</strong> Returns MP3 which plays on every device.
+            </p>
+            <p className="text-xs text-white/50">Hindi 🇮🇳 and Punjabi 🇮🇳 voices available. Tap a language below then Test Voice.</p>
+          </div>
+        )}
 
         {/* HuggingFace settings */}
         {provider === 'hf' && (
@@ -230,6 +248,33 @@ export default function VoiceCustomizer({ onClose, voiceLang = 'en-US', onLangCh
                   );
                 })}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Language picker for Cloud Voice */}
+        {provider === 'cloud' && (
+          <div>
+            <p className="text-xs text-white/50 mb-2">👇 Tap to select your language</p>
+            <div className="grid grid-cols-3 gap-2">
+              {HF_LANGS.map(l => {
+                const lang = VOICE_LANGUAGES.find(v => v.id === l);
+                if (!lang) return null;
+                const isSelected = selectedLang === l;
+                return (
+                  <button key={l} onClick={() => setSelectedLang(l)}
+                    className={`rounded-xl p-2.5 text-center transition-all border-2 ${
+                      isSelected ? 'bg-brand-500/25 border-brand-500/60' : 'glass border-transparent hover:border-white/20'
+                    }`}>
+                    <p className="text-xl mb-0.5">{lang.flag}</p>
+                    <p className="text-[10px] text-white font-medium">{lang.label}</p>
+                    {isSelected
+                      ? <p className="text-[9px] text-brand-400 font-semibold mt-0.5">✓ Selected</p>
+                      : <p className="text-[9px] text-green-400/70 mt-0.5">Cloud voice</p>
+                    }
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

@@ -138,6 +138,40 @@ export async function speakBrowser(text, langCode = 'en-US', onEnd) {
   return utt;
 }
 
+// ── Cloud TTS — StreamElements (Amazon Polly, free, MP3, works on iPhone) ─────
+
+const SE_VOICES = {
+  'hi-IN': 'Aditi',   // Hindi — decent quality, natural
+  'pa-IN': 'Aditi',   // Punjabi — use Hindi voice (best free option)
+  'en-US': 'Joanna',
+  'en-GB': 'Amy',
+  'es-ES': 'Conchita',
+  'fr-FR': 'Celine',
+  'de-DE': 'Marlene',
+  'ja-JP': 'Mizuki',
+  'zh-CN': 'Zhiyu',
+  'ko-KR': 'Seoyeon',
+  'pt-BR': 'Vitoria',
+  'ar-SA': 'Zeynep',
+};
+
+export async function fetchCloudTTS(text, langCode = 'en-US') {
+  const voice = SE_VOICES[langCode] || 'Joanna';
+  const url = `https://api.streamelements.com/kappa/v2/speech?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(text)}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok) throw new Error(`Cloud TTS error ${res.status}`);
+    return await res.blob(); // audio/mpeg — MP3, works on all devices
+  } catch (e) {
+    clearTimeout(timer);
+    if (e.name === 'AbortError') throw new Error('timeout');
+    throw new Error('network');
+  }
+}
+
 // ── Unified TTS (picks best available source) ─────────────────────────────────
 
 export async function getAudioBlob(text, langCode = 'en-US') {
@@ -146,6 +180,9 @@ export async function getAudioBlob(text, langCode = 'en-US') {
 
   if (provider === 'elevenlabs' && elKey) {
     return fetchElevenLabsAudio(text, elKey, voiceId);
+  }
+  if (provider === 'cloud') {
+    return fetchCloudTTS(text, langCode);
   }
   if (provider === 'hf' || hfToken) {
     return fetchHuggingFaceTTS(text, langCode);
