@@ -99,6 +99,7 @@ export default function Creator() {
   const [selectedTrack,      setSelectedTrack]      = useState(null);
   const [showMusicPicker,      setShowMusicPicker]      = useState(false);
   const [showVoiceCustomizer,  setShowVoiceCustomizer]  = useState(false);
+  const [animStyle,            setAnimStyle]            = useState('slide');
 
   // Modal state
   const [showApiKeyModal,    setShowApiKeyModal]    = useState(false);
@@ -217,6 +218,28 @@ export default function Creator() {
               }`}>
               <span className="text-lg">{s.emoji}</span>
               <span>{s.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Animation Style */}
+      <div>
+        <label className="text-sm text-white/50 mb-2 block font-medium">Animation Style</label>
+        <div className="grid grid-cols-5 gap-2">
+          {[
+            { id: 'slide',      icon: '✨', label: 'Slide' },
+            { id: 'bounce',     icon: '🏀', label: 'Bounce' },
+            { id: 'typewriter', icon: '⌨️', label: 'Type' },
+            { id: 'zoom',       icon: '🔍', label: 'Zoom' },
+            { id: 'neon',       icon: '💡', label: 'Neon' },
+          ].map(a => (
+            <button key={a.id} onClick={() => setAnimStyle(a.id)}
+              className={`flex flex-col items-center gap-1 p-2.5 rounded-xl border transition-all text-center ${
+                animStyle === a.id ? 'bg-brand-500/20 border-brand-500/50' : 'glass border-white/10 hover:border-white/20'
+              }`}>
+              <span className="text-lg">{a.icon}</span>
+              <span className="text-[10px] text-white/70">{a.label}</span>
             </button>
           ))}
         </div>
@@ -526,7 +549,7 @@ export default function Creator() {
   // ── Preview panel ─────────────────────────────────────────────────────────
   const previewPanel = (
     <div className="space-y-4">
-      <VideoPreview script={script} currentScene={currentScene} onSceneChange={setCurrentScene} voiceLang={voiceLang} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} />
+      <VideoPreview script={script} currentScene={currentScene} onSceneChange={setCurrentScene} voiceLang={voiceLang} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} animStyle={animStyle} />
       {isGenerating && (
         <div className="glass rounded-xl p-5 text-center">
           <div className="animate-pulse space-y-3 mb-3">

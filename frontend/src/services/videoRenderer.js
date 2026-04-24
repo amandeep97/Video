@@ -41,6 +41,10 @@ const STYLE_THEMES = {
 
 function ease(t) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
 function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+function elasticOut(t) {
+  if (t === 0 || t === 1) return t;
+  return Math.pow(2, -10 * t) * Math.sin((t - 0.075) * (2 * Math.PI) / 0.3) + 1;
+}
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 function lerp(a, b, t) { return a + (b - a) * t; }
 
@@ -203,9 +207,9 @@ function wrapLines(ctx, text, maxWidth) {
 }
 
 // Animated text with slide-up + fade effect
-function drawAnimatedText(ctx, text, x, y, font, color, alpha, slideProgress, textAlign = 'center') {
+function drawAnimatedText(ctx, text, x, y, font, color, alpha, slideProgress, textAlign = 'center', animStyle = 'slide', t = 0) {
   if (alpha <= 0) return;
-  const slideOffset = (1 - easeOut(clamp(slideProgress, 0, 1))) * 22;
+  const p = clamp(slideProgress, 0, 1);
   ctx.save();
   ctx.globalAlpha = clamp(alpha, 0, 1);
   ctx.font = font;
@@ -214,13 +218,60 @@ function drawAnimatedText(ctx, text, x, y, font, color, alpha, slideProgress, te
   ctx.textBaseline = 'alphabetic';
   ctx.shadowColor = 'rgba(0,0,0,0.6)';
   ctx.shadowBlur = 14;
-  ctx.fillText(text, x, y + slideOffset);
+
+  if (animStyle === 'bounce') {
+    const slideOffset = (1 - elasticOut(p)) * 22;
+    ctx.fillText(text, x, y + slideOffset);
+  } else if (animStyle === 'zoom') {
+    const s = lerp(0.6, 1.0, easeOut(p));
+    ctx.globalAlpha = clamp(alpha * easeOut(p), 0, 1);
+    ctx.translate(x, y);
+    ctx.scale(s, s);
+    ctx.translate(-x, -y);
+    ctx.fillText(text, x, y);
+  } else if (animStyle === 'typewriter') {
+    const charCount = Math.ceil(p * text.length);
+    const visible = text.slice(0, charCount);
+    ctx.shadowColor = 'rgba(0,0,0,0.6)';
+    ctx.shadowBlur = 14;
+    if (textAlign === 'center') {
+      ctx.font = font;
+      const fullWidth = ctx.measureText(text).width;
+      const startX = x - fullWidth / 2;
+      ctx.textAlign = 'left';
+      ctx.fillText(visible, startX, y);
+      if (charCount < text.length && Math.floor(t * 2) % 2 === 0) {
+        const visW = ctx.measureText(visible).width;
+        ctx.fillText('|', startX + visW, y);
+      }
+    } else {
+      ctx.fillText(visible, x, y);
+      if (charCount < text.length && Math.floor(t * 2) % 2 === 0) {
+        const visW = ctx.measureText(visible).width;
+        ctx.fillText('|', x + visW, y);
+      }
+    }
+  } else if (animStyle === 'neon') {
+    const slideOffset = (1 - easeOut(p)) * 22;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 18 + Math.sin(t * 2) * 6;
+    ctx.globalAlpha = clamp(alpha * 0.4, 0, 1);
+    ctx.fillText(text, x, y + slideOffset);
+    ctx.shadowBlur = 18 + Math.sin(t * 2) * 6;
+    ctx.globalAlpha = clamp(alpha, 0, 1);
+    ctx.fillText(text, x, y + slideOffset);
+  } else {
+    // slide (default)
+    const slideOffset = (1 - easeOut(p)) * 22;
+    ctx.fillText(text, x, y + slideOffset);
+  }
+
   ctx.restore();
 }
 
 // ── Layout renderers ──────────────────────────────────────────────────────────
 
-function renderIntro(ctx, scene, theme, W, H, p, t) {
+function renderIntro(ctx, scene, theme, W, H, p, t, animStyle = 'slide') {
   // Large emoji centered high
   if (scene.emoji) {
     const scale = 1 + Math.sin(t * 1.5) * 0.04;
@@ -242,7 +293,7 @@ function renderIntro(ctx, scene, theme, W, H, p, t) {
   const titleLines = wrapLines(ctx, scene.title || '', W - 100);
   const startY = H * 0.54;
   titleLines.slice(0, 3).forEach((line, i) => {
-    drawAnimatedText(ctx, line, W / 2, startY + i * 42, `bold 32px -apple-system, BlinkMacSystemFont, sans-serif`, theme.text, titleAlpha, p - i * 0.06);
+    drawAnimatedText(ctx, line, W / 2, startY + i * 42, `bold 32px -apple-system, BlinkMacSystemFont, sans-serif`, theme.text, titleAlpha, p - i * 0.06, 'center', animStyle, t);
   });
   ctx.restore();
 
@@ -254,7 +305,7 @@ function renderIntro(ctx, scene, theme, W, H, p, t) {
     ctx.textAlign = 'center';
     const subLines = wrapLines(ctx, scene.narration.slice(0, 90), W - 140);
     subLines.slice(0, 2).forEach((line, i) => {
-      drawAnimatedText(ctx, line, W / 2, H * 0.72 + i * 24, `15px -apple-system, sans-serif`, theme.sub, subAlpha * 0.8, p - 0.1 - i * 0.05);
+      drawAnimatedText(ctx, line, W / 2, H * 0.72 + i * 24, `15px -apple-system, sans-serif`, theme.sub, subAlpha * 0.8, p - 0.1 - i * 0.05, 'center', animStyle, t);
     });
     ctx.restore();
   }
@@ -272,7 +323,7 @@ function renderIntro(ctx, scene, theme, W, H, p, t) {
   }
 }
 
-function renderContent(ctx, scene, theme, W, H, p, t) {
+function renderContent(ctx, scene, theme, W, H, p, t, animStyle = 'slide') {
   // Emoji top-left accent
   if (scene.emoji) {
     const emojiAlpha = clamp(p / 0.12, 0, 0.8);
@@ -292,7 +343,7 @@ function renderContent(ctx, scene, theme, W, H, p, t) {
   ctx.textAlign = 'left';
   const titleLines = wrapLines(ctx, scene.title || '', W - 60);
   titleLines.slice(0, 2).forEach((line, i) => {
-    drawAnimatedText(ctx, line, 36, H * 0.34 + i * 34, `bold 24px -apple-system, BlinkMacSystemFont, sans-serif`, theme.text, titleAlpha, p - i * 0.04, 'left');
+    drawAnimatedText(ctx, line, 36, H * 0.34 + i * 34, `bold 24px -apple-system, BlinkMacSystemFont, sans-serif`, theme.text, titleAlpha, p - i * 0.04, 'left', animStyle, t);
   });
   ctx.restore();
 
@@ -341,7 +392,7 @@ function renderContent(ctx, scene, theme, W, H, p, t) {
   });
 }
 
-function renderList(ctx, scene, theme, W, H, p, t) {
+function renderList(ctx, scene, theme, W, H, p, t, animStyle = 'slide') {
   // Header bar
   const headerAlpha = clamp(p / 0.1, 0, 1);
   if (headerAlpha > 0) {
@@ -355,7 +406,7 @@ function renderList(ctx, scene, theme, W, H, p, t) {
 
   // Title in header
   const titleAlpha = p < 0.1 ? p / 0.1 : p > 0.9 ? (1 - p) / 0.1 : 1;
-  drawAnimatedText(ctx, scene.title || '', W / 2, H * 0.14 + 22, `bold 20px -apple-system, BlinkMacSystemFont, sans-serif`, theme.text, titleAlpha, p, 'center');
+  drawAnimatedText(ctx, scene.title || '', W / 2, H * 0.14 + 22, `bold 20px -apple-system, BlinkMacSystemFont, sans-serif`, theme.text, titleAlpha, p, 'center', animStyle, t);
 
   // Numbered items
   const items = scene.keyPoints || [];
@@ -398,7 +449,7 @@ function renderList(ctx, scene, theme, W, H, p, t) {
   });
 }
 
-function renderHighlight(ctx, scene, theme, W, H, p, t) {
+function renderHighlight(ctx, scene, theme, W, H, p, t, animStyle = 'slide') {
   // Big centered quote / statement
   const titleAlpha = p < 0.15 ? p / 0.15 : p > 0.85 ? (1 - p) / 0.15 : 1;
 
@@ -421,7 +472,7 @@ function renderHighlight(ctx, scene, theme, W, H, p, t) {
   const totalH = lines.length * 38;
   const startY = H / 2 - totalH / 2;
   lines.slice(0, 4).forEach((line, i) => {
-    drawAnimatedText(ctx, line, W / 2, startY + i * 38, `bold 26px -apple-system, BlinkMacSystemFont, sans-serif`, theme.text, titleAlpha, p - i * 0.06, 'center');
+    drawAnimatedText(ctx, line, W / 2, startY + i * 38, `bold 26px -apple-system, BlinkMacSystemFont, sans-serif`, theme.text, titleAlpha, p - i * 0.06, 'center', animStyle, t);
   });
   ctx.restore();
 
@@ -438,7 +489,7 @@ function renderHighlight(ctx, scene, theme, W, H, p, t) {
   }
 }
 
-function renderOutro(ctx, scene, theme, W, H, p, t) {
+function renderOutro(ctx, scene, theme, W, H, p, t, animStyle = 'slide') {
   // CTA pill background
   const ctaAlpha = clamp((p - 0.1) / 0.15, 0, 1) * (p > 0.9 ? (1 - p) / 0.1 : 1);
   if (ctaAlpha > 0) {
@@ -469,12 +520,12 @@ function renderOutro(ctx, scene, theme, W, H, p, t) {
   ctx.font = `bold 28px -apple-system, BlinkMacSystemFont, sans-serif`;
   const tlines = wrapLines(ctx, scene.title || '', W - 100);
   tlines.slice(0, 2).forEach((line, i) => {
-    drawAnimatedText(ctx, line, W / 2, H * 0.5 + i * 38, `bold 28px -apple-system, BlinkMacSystemFont, sans-serif`, theme.text, titleAlpha, p - i * 0.06, 'center');
+    drawAnimatedText(ctx, line, W / 2, H * 0.5 + i * 38, `bold 28px -apple-system, BlinkMacSystemFont, sans-serif`, theme.text, titleAlpha, p - i * 0.06, 'center', animStyle, t);
   });
   ctx.restore();
 
   // CTA label
-  drawAnimatedText(ctx, 'Subscribe & Share', W / 2, H * 0.67, `bold 14px -apple-system, sans-serif`, theme.accent, ctaAlpha, p - 0.15, 'center');
+  drawAnimatedText(ctx, 'Subscribe & Share', W / 2, H * 0.67, `bold 14px -apple-system, sans-serif`, theme.accent, ctaAlpha, p - 0.15, 'center', animStyle, t);
 
   // Pulsing dot below CTA
   if (ctaAlpha > 0) {
@@ -609,6 +660,7 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
 
   const t = timestamp / 1000;
   const p = clamp(progress, 0, 1);
+  const animStyle = opts.animStyle || 'slide';
   const layout   = detectLayout(scene, sceneIndex, totalScenes);
   const hasVideo = bgVideo && bgVideo.readyState >= 2;
   const hasImage = bgImage && bgImage.naturalWidth > 0;
@@ -629,11 +681,11 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
   // Layer 3: scene content
   ctx.save();
   switch (layout) {
-    case 'intro':      renderIntro(ctx, scene, theme, W, H, p, t);     break;
-    case 'outro':      renderOutro(ctx, scene, theme, W, H, p, t);     break;
-    case 'highlight':  renderHighlight(ctx, scene, theme, W, H, p, t); break;
-    case 'list':       renderList(ctx, scene, theme, W, H, p, t);      break;
-    default:           renderContent(ctx, scene, theme, W, H, p, t);   break;
+    case 'intro':      renderIntro(ctx, scene, theme, W, H, p, t, animStyle);     break;
+    case 'outro':      renderOutro(ctx, scene, theme, W, H, p, t, animStyle);     break;
+    case 'highlight':  renderHighlight(ctx, scene, theme, W, H, p, t, animStyle); break;
+    case 'list':       renderList(ctx, scene, theme, W, H, p, t, animStyle);      break;
+    default:           renderContent(ctx, scene, theme, W, H, p, t, animStyle);   break;
   }
   ctx.restore();
 
