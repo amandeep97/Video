@@ -12,7 +12,7 @@ export const FORMATS = {
   square:    { w: 450, h: 450, aspect: '1/1',   label: '1:1',  icon: '⬜' },
 };
 
-export default function VideoPreview({ script, currentScene, onSceneChange, voiceLang = 'en-US', videoFormat = 'landscape', showCaptions = false, musicStyle = 'none', customMusicUrl = null, animStyle = 'slide' }) {
+export default function VideoPreview({ script, currentScene, onSceneChange, voiceLang = 'en-US', videoFormat = 'landscape', showCaptions = false, musicStyle = 'none', customMusicUrl = null, animStyle = 'slide', filterStyle = 'none', watermark = '' }) {
   const canvasRef     = useRef(null);
   const animFrameRef  = useRef(null);
   const videoEls      = useRef({});
@@ -136,7 +136,7 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
       const bgImage = imageEls.current[sceneIndexRef.current] || null;
 
       if (scene) {
-        renderFrame(ctx, scene, script, sceneIndexRef.current, totalScenes, p, timestamp, bgVideo, bgImage, { captions: showCaptions, animStyle });
+        renderFrame(ctx, scene, script, sceneIndexRef.current, totalScenes, p, timestamp, bgVideo, bgImage, { captions: showCaptions, animStyle, filterStyle, watermark, lowerThird: scene?.lowerThird });
         if (isSpeaking) {
           const W = canvas.width, H = canvas.height;
           ctx.save();
@@ -157,7 +157,7 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
 
     animFrameRef.current = requestAnimationFrame(draw);
     return () => { if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
-  }, [scene, isPlaying, isSpeaking, script, totalScenes, onSceneChange, stopSpeech, stopMusic, showCaptions, loadState, animStyle]);
+  }, [scene, isPlaying, isSpeaking, script, totalScenes, onSceneChange, stopSpeech, stopMusic, showCaptions, loadState, animStyle, filterStyle, watermark]);
 
   const handlePlayPause = () => {
     if (isPlaying) {

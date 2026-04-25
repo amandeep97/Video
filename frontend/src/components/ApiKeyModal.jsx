@@ -5,6 +5,7 @@ import { getElevenLabsSettings, saveElevenLabsSettings, ELEVENLABS_VOICES } from
 import { getPexelsKey, savePexelsKey } from '../services/pexels.js';
 import { getJamendoKey, saveJamendoKey } from '../services/jamendo.js';
 import { getFreesoundKey, saveFreesoundKey } from '../services/freesound.js';
+import { getFalKey, saveFalKey } from '../services/fal.js';
 
 export default function ApiKeyModal({ onClose }) {
   const current    = getSettings();
@@ -25,6 +26,8 @@ export default function ApiKeyModal({ onClose }) {
   const [showJm,        setShowJm]        = useState(false);
   const [freesoundKey,  setFreesoundKey]  = useState(getFreesoundKey());
   const [showFs,        setShowFs]        = useState(false);
+  const [falKey,        setFalKey]        = useState(getFalKey());
+  const [showFal,       setShowFal]       = useState(false);
 
   const provider = PROVIDERS[selectedProvider];
 
@@ -41,6 +44,7 @@ export default function ApiKeyModal({ onClose }) {
     savePexelsKey(pexelsKey);
     saveJamendoKey(jamendoKey);
     saveFreesoundKey(freesoundKey);
+    saveFalKey(falKey);
     setSaved(true);
     setTimeout(() => { setSaved(false); onClose(); }, 700);
   };
@@ -178,6 +182,38 @@ export default function ApiKeyModal({ onClose }) {
               <p className="text-xs text-white/40 leading-relaxed">
                 Key stored only in this browser. Videos fetched directly from Pexels CDN.
               </p>
+            </div>
+
+            <div className="border-t border-white/10" />
+
+            {/* FAL.ai AI Video Generation */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🎬</span>
+                <div>
+                  <p className="text-sm font-semibold text-white">FAL.ai <span className="text-xs text-purple-400 font-normal">— AI Video Generation</span></p>
+                  <p className="text-xs text-white/40">Generate real AI video clips per scene (~$0.05/clip). Like Sora.</p>
+                </div>
+                {falKey && <span className="ml-auto w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />}
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-white/50">FAL.ai API Key</label>
+                  <a href="https://fal.ai" target="_blank" rel="noopener noreferrer"
+                    className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">
+                    Get free credits → fal.ai <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+                <div className="relative">
+                  <input type={showFal ? 'text' : 'password'} value={falKey}
+                    onChange={e => setFalKey(e.target.value)}
+                    placeholder="fal_..." className="input-field pr-10 font-mono text-sm" />
+                  <button type="button" onClick={() => setShowFal(s => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white">
+                    {showFal ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

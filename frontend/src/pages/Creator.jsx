@@ -100,6 +100,8 @@ export default function Creator() {
   const [showMusicPicker,      setShowMusicPicker]      = useState(false);
   const [showVoiceCustomizer,  setShowVoiceCustomizer]  = useState(false);
   const [animStyle,            setAnimStyle]            = useState('slide');
+  const [filterStyle,          setFilterStyle]          = useState('none');
+  const [watermark,            setWatermark]            = useState('');
 
   // Modal state
   const [showApiKeyModal,    setShowApiKeyModal]    = useState(false);
@@ -240,6 +242,30 @@ export default function Creator() {
               }`}>
               <span className="text-lg">{a.icon}</span>
               <span className="text-[10px] text-white/70">{a.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Color Filter */}
+      <div>
+        <label className="text-sm text-white/50 mb-2 block font-medium">Color Filter</label>
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { id: 'none',      icon: '⬜', label: 'Normal' },
+            { id: 'cinematic', icon: '🎬', label: 'Cinematic' },
+            { id: 'vintage',   icon: '📷', label: 'Vintage' },
+            { id: 'warm',      icon: '🌅', label: 'Warm' },
+            { id: 'cool',      icon: '❄️', label: 'Cool' },
+            { id: 'bw',        icon: '⬛', label: 'B&W' },
+            { id: 'vivid',     icon: '🌈', label: 'Vivid' },
+          ].map(f => (
+            <button key={f.id} onClick={() => setFilterStyle(f.id)}
+              className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all ${
+                filterStyle === f.id ? 'bg-brand-500/20 border-brand-500/50' : 'glass border-white/10'
+              }`}>
+              <span className="text-base">{f.icon}</span>
+              <span className="text-[10px] text-white/60">{f.label}</span>
             </button>
           ))}
         </div>
@@ -497,6 +523,12 @@ export default function Creator() {
               <select value={scriptLang} onChange={e => setScriptLang(e.target.value)} className="input-field text-sm py-2">
                 {SCRIPT_LANGS.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
+            </div>
+            <div>
+              <label className="text-xs text-white/50 mb-1.5 block">Watermark (optional)</label>
+              <input type="text" value={watermark} onChange={e => setWatermark(e.target.value)}
+                placeholder="@yourhandle or brand name"
+                className="input-field text-sm" />
             </div>
           </div>
         )}

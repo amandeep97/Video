@@ -546,6 +546,7 @@ function detectLayout(scene, sceneIndex, totalScenes) {
   if (sceneIndex === totalScenes - 1) return 'outro';
   const hasMany = (scene.keyPoints || []).length >= 4;
   if (hasMany) return 'list';
+  if (scene.keyPoints?.length === 0 && (scene.title?.length > 50 || scene.title?.startsWith('"') || scene.title?.startsWith('“'))) return 'quote';
   if (scene.keyPoints?.length === 0 && scene.title?.length > 40) return 'highlight';
   return 'content';
 }
@@ -647,6 +648,92 @@ function renderCaptions(ctx, narration, progress, W, H) {
   ctx.restore();
 }
 
+// ── Lower Third overlay ───────────────────────────────────────────────────────
+function drawLowerThird(ctx, name, title, W, H, p, theme) {
+  const slideP = p < 0.12 ? easeOut(p / 0.12) : p > 0.82 ? easeOut((1 - p) / 0.18) : 1;
+  if (slideP <= 0) return;
+  const barY = H * 0.78;
+  const barH = 54;
+  const slideX = (1 - slideP) * (-W * 0.6);
+  ctx.save();
+  ctx.globalAlpha = slideP;
+  // Gradient bar
+  const grad = ctx.createLinearGradient(slideX, 0, slideX + W * 0.7, 0);
+  grad.addColorStop(0, rgba(theme.accent, 0.88));
+  grad.addColorStop(0.7, rgba(theme.accent, 0.70));
+  grad.addColorStop(1, rgba(theme.accent, 0));
+  ctx.fillStyle = grad;
+  ctx.fillRect(slideX, barY, W * 0.7, barH);
+  // Name text
+  ctx.font = 'bold 15px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  ctx.shadowBlur = 6;
+  ctx.fillText(name, slideX + 16, barY + 22);
+  // Title text
+  if (title) {
+    ctx.font = '11px -apple-system, sans-serif';
+    ctx.fillStyle = rgba(theme.text, 0.85);
+    ctx.fillText(title, slideX + 16, barY + 38);
+  }
+  ctx.restore();
+}
+
+// ── Watermark ────────────────────────────────────────────────────────────────
+function drawWatermark(ctx, text, W, H) {
+  ctx.save();
+  ctx.font = 'bold 11px -apple-system, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.30)';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  ctx.shadowBlur = 4;
+  ctx.fillText(text, W - 14, H - 14);
+  ctx.restore();
+}
+
+// ── Quote layout renderer ─────────────────────────────────────────────────────
+function renderQuote(ctx, scene, theme, W, H, p, t, animStyle) {
+  const alpha = p < 0.15 ? p / 0.15 : p > 0.85 ? (1 - p) / 0.15 : 1;
+  // Large decorative quote mark
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.13;
+  ctx.font = 'bold 160px Georgia, serif';
+  ctx.fillStyle = theme.accent;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('"', 16, H * 0.08);
+  ctx.restore();
+  // Main quote text
+  ctx.save();
+  ctx.font = 'bold 25px -apple-system, BlinkMacSystemFont, sans-serif';
+  const lines = wrapLines(ctx, scene.title || '', W - 80);
+  const totalH = lines.length * 36;
+  const startY = H / 2 - totalH / 2;
+  lines.slice(0, 5).forEach((line, i) => {
+    drawAnimatedText(ctx, line, W / 2, startY + i * 36, 'bold 25px -apple-system, BlinkMacSystemFont, sans-serif', theme.text, alpha, p - i * 0.05, 'center', animStyle, t);
+  });
+  ctx.restore();
+  // Attribution line
+  if (scene.narration) {
+    const attr = scene.narration.slice(0, 55) + (scene.narration.length > 55 ? '…' : '');
+    const attrAlpha = clamp((p - 0.2) / 0.15, 0, 1) * alpha;
+    drawAnimatedText(ctx, '— ' + attr, W / 2, H * 0.76, '13px -apple-system, sans-serif', theme.sub, attrAlpha * 0.75, p - 0.2, 'center', 'slide', t);
+  }
+  // Emoji
+  if (scene.emoji) {
+    ctx.save();
+    ctx.font = `${36 + Math.sin(t * 1.4) * 2}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.globalAlpha = alpha * 0.8;
+    ctx.fillText(scene.emoji, W / 2, H * 0.86);
+    ctx.restore();
+  }
+}
+
 // ── Main public render function ───────────────────────────────────────────────
 export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progress, timestamp, bgVideo = null, bgImage = null, opts = {}) {
   const W = ctx.canvas.width;
@@ -661,9 +748,13 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
   const t = timestamp / 1000;
   const p = clamp(progress, 0, 1);
   const animStyle = opts.animStyle || 'slide';
+  const filterStyle = opts.filterStyle || 'none';
   const layout   = detectLayout(scene, sceneIndex, totalScenes);
   const hasVideo = bgVideo && bgVideo.readyState >= 2;
   const hasImage = bgImage && bgImage.naturalWidth > 0;
+
+  // Apply B&W filter before background drawing
+  if (filterStyle === 'bw') ctx.filter = 'grayscale(1) contrast(1.05)';
 
   // Layer 1: background — priority: video > AI image > gradient
   if (hasVideo) {
@@ -673,6 +764,23 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
   } else {
     drawBackground(ctx, theme, W, H, t);
     drawParticles(ctx, theme, W, H, t);
+  }
+
+  // Color filter overlay
+  if (filterStyle !== 'none' && filterStyle !== 'bw') {
+    ctx.save();
+    const filterMap = {
+      cinematic: 'rgba(0,15,40,0.22)',
+      vintage:   'rgba(160,100,40,0.20)',
+      warm:      'rgba(255,130,0,0.13)',
+      cool:      'rgba(0,80,220,0.13)',
+      vivid:     'rgba(200,0,120,0.09)',
+    };
+    if (filterMap[filterStyle]) {
+      ctx.fillStyle = filterMap[filterStyle];
+      ctx.fillRect(0, 0, W, H);
+    }
+    ctx.restore();
   }
 
   // Layer 2: geometric accents
@@ -685,18 +793,30 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
     case 'outro':      renderOutro(ctx, scene, theme, W, H, p, t, animStyle);     break;
     case 'highlight':  renderHighlight(ctx, scene, theme, W, H, p, t, animStyle); break;
     case 'list':       renderList(ctx, scene, theme, W, H, p, t, animStyle);      break;
+    case 'quote':      renderQuote(ctx, scene, theme, W, H, p, t, animStyle);     break;
     default:           renderContent(ctx, scene, theme, W, H, p, t, animStyle);   break;
   }
   ctx.restore();
+
+  // Layer: Lower Third
+  if (opts.lowerThird?.name) {
+    drawLowerThird(ctx, opts.lowerThird.name, opts.lowerThird.title || '', W, H, p, theme);
+  }
 
   // Layer 4: captions
   if (opts.captions && scene?.narration) {
     renderCaptions(ctx, scene.narration, p, W, H);
   }
 
+  // Watermark
+  if (opts.watermark) drawWatermark(ctx, opts.watermark, W, H);
+
   // Layer 5: HUD (only in preview, not exported video)
   if (!opts.export) {
     drawScenePill(ctx, theme, sceneIndex + 1, totalScenes, W, t);
     drawProgressBar(ctx, theme, W, H, p);
   }
+
+  // Reset B&W filter
+  if (filterStyle === 'bw') ctx.filter = 'none';
 }
