@@ -554,13 +554,13 @@ function detectLayout(scene, sceneIndex, totalScenes) {
 // ── Cinematic vignette overlay (used by both video + image backgrounds) ───────
 function drawVignette(ctx, theme, W, H) {
   const overlay = ctx.createLinearGradient(0, 0, 0, H);
-  overlay.addColorStop(0,    'rgba(0,0,0,0.62)');
-  overlay.addColorStop(0.35, 'rgba(0,0,0,0.28)');
-  overlay.addColorStop(0.65, 'rgba(0,0,0,0.32)');
-  overlay.addColorStop(1,    'rgba(0,0,0,0.70)');
+  overlay.addColorStop(0,    'rgba(0,0,0,0.50)');
+  overlay.addColorStop(0.35, 'rgba(0,0,0,0.16)');
+  overlay.addColorStop(0.65, 'rgba(0,0,0,0.18)');
+  overlay.addColorStop(1,    'rgba(0,0,0,0.48)');
   ctx.fillStyle = overlay;
   ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = rgba(theme.accent, 0.07);
+  ctx.fillStyle = rgba(theme.accent, 0.04);
   ctx.fillRect(0, 0, W, H);
 }
 
@@ -600,7 +600,7 @@ function drawKenBurns(ctx, img, theme, W, H, progress, sceneIndex) {
   drawVignette(ctx, theme, W, H);
 }
 
-// ── Word-by-word captions (CapCut/Reels style) ───────────────────────────────
+// ── Word-by-word captions (TikTok/CapCut style — yellow highlight) ───────────
 function renderCaptions(ctx, narration, progress, W, H) {
   if (!narration?.trim()) return;
   const words = narration.trim().split(/\s+/);
@@ -608,40 +608,31 @@ function renderCaptions(ctx, narration, progress, W, H) {
 
   const currentIdx = Math.min(Math.floor(progress * words.length), words.length - 1);
   const winStart   = Math.max(0, currentIdx - 2);
-  const winEnd     = Math.min(words.length, winStart + 7);
+  const winEnd     = Math.min(words.length, winStart + 6);
   const visible    = words.slice(winStart, winEnd);
   const activeI    = currentIdx - winStart;
 
   ctx.save();
-  ctx.font = `bold 16px -apple-system, BlinkMacSystemFont, sans-serif`;
+  const fontSize = Math.max(15, Math.round(Math.min(21, W * 0.027)));
+  ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
 
-  // Measure total width of line
   const spaceW = ctx.measureText(' ').width;
-  let totalW = visible.reduce((w, word, i) => w + ctx.measureText(word).width + (i < visible.length - 1 ? spaceW : 0), 0);
+  let totalW = visible.reduce((acc, word, i) =>
+    acc + ctx.measureText(word).width + (i < visible.length - 1 ? spaceW : 0), 0);
   totalW = Math.min(totalW, W - 48);
 
-  const boxH = 38, padX = 14;
-  const boxX = W / 2 - totalW / 2 - padX;
-  const boxY = H - 58;
-  const boxW = totalW + padX * 2;
-
-  // Semi-transparent background pill
-  ctx.fillStyle = 'rgba(0,0,0,0.70)';
-  ctx.beginPath(); ctx.roundRect(boxX, boxY, boxW, boxH, 10); ctx.fill();
-
-  // Draw each word
+  // Shadow-only style (no pill box) — clean TikTok look
   let x = W / 2 - totalW / 2;
-  const y = boxY + boxH / 2;
+  const y = H - 52;
   visible.forEach((word, i) => {
     const active = i === activeI;
-    ctx.font = active
-      ? `bold 16px -apple-system, BlinkMacSystemFont, sans-serif`
-      : `16px -apple-system, BlinkMacSystemFont, sans-serif`;
-    ctx.fillStyle     = active ? '#ffffff' : 'rgba(255,255,255,0.5)';
-    ctx.textAlign     = 'left';
-    ctx.textBaseline  = 'middle';
-    ctx.shadowColor   = 'rgba(0,0,0,0.9)';
-    ctx.shadowBlur    = 3;
+    ctx.font         = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.textAlign    = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor  = 'rgba(0,0,0,1)';
+    ctx.shadowBlur   = active ? 10 : 7;
+    // Active word: bright yellow; others: white
+    ctx.fillStyle    = active ? '#FFE600' : 'rgba(255,255,255,0.90)';
     ctx.fillText(word, x, y);
     x += ctx.measureText(word).width + spaceW;
   });
@@ -769,6 +760,173 @@ function drawTrackingEffect(ctx, W, H, t, p) {
   ctx.restore();
 }
 
+// ── Cinematic mode helpers (used when real video/image background is present) ──
+
+function drawBottomGradient(ctx, W, H) {
+  const g = ctx.createLinearGradient(0, H * 0.60, 0, H);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,0.82)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, H * 0.60, W, H * 0.40);
+}
+
+function drawTopBar(ctx, W, H) {
+  const g = ctx.createLinearGradient(0, 0, 0, H * 0.18);
+  g.addColorStop(0, 'rgba(0,0,0,0.42)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H * 0.18);
+}
+
+// Intro scene in cinematic mode — large centred title + underline
+function renderCinematicIntro(ctx, scene, theme, W, H, p, t, animStyle) {
+  const ta = p < 0.12 ? easeOut(p / 0.12) : p > 0.85 ? easeOut((1 - p) / 0.15) : 1;
+
+  if (scene.emoji) {
+    ctx.save();
+    const sz = Math.round(Math.min(80, W * 0.10));
+    ctx.font = `${sz + Math.sin(t * 1.5) * 2}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.globalAlpha = ta * 0.92;
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.shadowBlur = 22;
+    ctx.fillText(scene.emoji, W / 2, H * 0.36);
+    ctx.restore();
+  }
+
+  const tsz = Math.round(Math.min(38, Math.max(22, W * 0.047)));
+  ctx.font = `bold ${tsz}px -apple-system, BlinkMacSystemFont, sans-serif`;
+  const tlines = wrapLines(ctx, scene.title || '', W - 80);
+  const lineH = tsz + 10;
+  const startY = (scene.emoji ? H * 0.54 : H * 0.46) - (Math.min(tlines.length, 3) * lineH) / 2;
+  tlines.slice(0, 3).forEach((line, i) => {
+    drawAnimatedText(ctx, line, W / 2, startY + i * lineH,
+      `bold ${tsz}px -apple-system, BlinkMacSystemFont, sans-serif`,
+      '#ffffff', ta, p - i * 0.06, 'center', animStyle, t);
+  });
+
+  // Animated accent underline
+  const ulP = easeOut(Math.min((p - 0.10) / 0.10, 1));
+  if (ulP > 0 && ta > 0) {
+    ctx.save();
+    ctx.globalAlpha = ta * ulP;
+    const ulW = Math.min(W * 0.45, 220) * ulP;
+    const ulY = startY + Math.min(tlines.length, 3) * lineH + 8;
+    const g = ctx.createLinearGradient(W / 2 - ulW / 2, 0, W / 2 + ulW / 2, 0);
+    g.addColorStop(0, rgba(theme.accent, 0));
+    g.addColorStop(0.5, rgba(theme.accent, 0.95));
+    g.addColorStop(1, rgba(theme.accent, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(W / 2 - ulW / 2, ulY, ulW, 3);
+    ctx.restore();
+  }
+}
+
+// Content scene in cinematic mode — title fades in at bottom-left then disappears
+function renderCinematicContent(ctx, scene, theme, W, H, p, t, animStyle) {
+  // Title visible for first ~38% of scene only
+  let ta;
+  if      (p < 0.08) ta = easeOut(p / 0.08);
+  else if (p < 0.30) ta = 1;
+  else if (p < 0.44) ta = easeOut((0.44 - p) / 0.14);
+  else               ta = 0;
+
+  if (ta > 0) {
+    const tsz  = Math.round(Math.min(30, Math.max(18, W * 0.037)));
+    const baseY = H * 0.76;
+    const slideOff = (1 - easeOut(Math.min(p / 0.10, 1))) * 22;
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.95)';
+    ctx.shadowBlur  = 14;
+
+    // Accent left bar slides in
+    const barP = easeOut(Math.min(p / 0.07, 1));
+    ctx.globalAlpha = ta * barP;
+    ctx.fillStyle = theme.accent;
+    ctx.fillRect(18, baseY - tsz, 4, tsz * 1.5);
+
+    // Title
+    ctx.globalAlpha = ta;
+    ctx.font = `bold ${tsz}px -apple-system, BlinkMacSystemFont, sans-serif`;
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    const lines = wrapLines(ctx, scene.title || '', W - 58);
+    lines.slice(0, 2).forEach((line, i) => {
+      ctx.fillText(line, 28, baseY + i * (tsz + 6) + slideOff);
+    });
+    ctx.restore();
+  }
+
+  // Emoji appears top-right after title fades
+  if (scene.emoji && p > 0.48) {
+    const ea = Math.min((p - 0.48) / 0.14, 1) * (p > 0.90 ? easeOut((1 - p) / 0.10) : 1);
+    if (ea > 0) {
+      ctx.save();
+      ctx.globalAlpha = ea * 0.65;
+      const sz = Math.round(Math.min(38, W * 0.055)) + Math.sin(t * 1.3) * 1.5;
+      ctx.font = `${sz}px serif`;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      ctx.shadowColor = 'rgba(0,0,0,0.7)';
+      ctx.shadowBlur = 10;
+      ctx.fillText(scene.emoji, W - 18, 18);
+      ctx.restore();
+    }
+  }
+}
+
+// Outro scene in cinematic mode — centred title + pulsing CTA pill
+function renderCinematicOutro(ctx, scene, theme, W, H, p, t, animStyle) {
+  const ta = p < 0.12 ? easeOut(p / 0.12) : p > 0.85 ? easeOut((1 - p) / 0.15) : 1;
+
+  if (scene.emoji) {
+    ctx.save();
+    const sz = Math.round(Math.min(70, W * 0.09));
+    ctx.font = `${sz + Math.sin(t * 1.4) * 2}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.globalAlpha = ta * 0.90;
+    ctx.shadowColor = 'rgba(0,0,0,0.8)';
+    ctx.shadowBlur = 20;
+    ctx.fillText(scene.emoji, W / 2, H * 0.33);
+    ctx.restore();
+  }
+
+  const tsz = Math.round(Math.min(34, Math.max(20, W * 0.042)));
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.9)';
+  ctx.shadowBlur = 16;
+  const tlines = wrapLines(ctx, scene.title || '', W - 80);
+  tlines.slice(0, 2).forEach((line, i) => {
+    drawAnimatedText(ctx, line, W / 2, H * 0.52 + i * (tsz + 10),
+      `bold ${tsz}px -apple-system, BlinkMacSystemFont, sans-serif`,
+      '#ffffff', ta, p - i * 0.06, 'center', animStyle, t);
+  });
+  ctx.restore();
+
+  // Pulsing CTA button
+  const ctaA = clamp((p - 0.22) / 0.15, 0, 1) * ta;
+  if (ctaA > 0) {
+    ctx.save();
+    ctx.globalAlpha = ctaA;
+    const pulse = 0.85 + Math.sin(t * 3) * 0.08;
+    const pillW = 170, pillH = 38;
+    const pillX = W / 2 - pillW / 2, pillY = H * 0.67;
+    ctx.fillStyle = rgba(theme.accent, pulse);
+    ctx.beginPath(); ctx.roundRect(pillX, pillY, pillW, pillH, 19); ctx.fill();
+    ctx.font = `bold 14px -apple-system, sans-serif`;
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 0;
+    ctx.fillText('Like & Subscribe ❤️', W / 2, pillY + pillH / 2);
+    ctx.restore();
+  }
+}
+
 // ── Main public render function ───────────────────────────────────────────────
 export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progress, timestamp, bgVideo = null, bgImage = null, opts = {}) {
   const W = ctx.canvas.width;
@@ -785,11 +943,12 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
   const animStyle = opts.animStyle || 'slide';
   const filterStyle = opts.filterStyle || 'none';
   const styleEffect = opts.styleEffect || 'none';
-  const layout   = detectLayout(scene, sceneIndex, totalScenes);
-  const hasVideo = bgVideo && bgVideo.readyState >= 2;
-  const hasImage = bgImage && bgImage.naturalWidth > 0;
+  const layout    = detectLayout(scene, sceneIndex, totalScenes);
+  const hasVideo  = bgVideo && bgVideo.readyState >= 2;
+  const hasImage  = bgImage && bgImage.naturalWidth > 0;
+  const hasRealBg = hasVideo || hasImage; // cinematic mode when real footage exists
 
-  // Build combined canvas filter (bw + styleEffect)
+  // Canvas colour grading filter
   const styleFilters = {
     cartoon: 'contrast(1.5) saturate(2.2)',
     sketch:  'grayscale(1) contrast(2.5) brightness(1.15)',
@@ -802,7 +961,7 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
   if (styleFilters[styleEffect]) canvasFilter += styleFilters[styleEffect];
   if (canvasFilter.trim()) ctx.filter = canvasFilter.trim();
 
-  // Layer 1: background — priority: video > AI image > gradient
+  // ── Layer 1: Background ───────────────────────────────────────────────────
   if (hasVideo) {
     drawVideoBackground(ctx, bgVideo, theme, W, H);
   } else if (hasImage) {
@@ -812,10 +971,9 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
     drawParticles(ctx, theme, W, H, t);
   }
 
-  // Reset canvas filter before overlay draws so they aren't double-filtered
   if (canvasFilter.trim()) ctx.filter = 'none';
 
-  // Color filter overlay
+  // Colour filter overlay
   if (filterStyle !== 'none' && filterStyle !== 'bw') {
     ctx.save();
     const filterMap = {
@@ -832,40 +990,44 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
     ctx.restore();
   }
 
-  // Layer 2: geometric accents
-  drawAccents(ctx, theme, W, H, t, layout);
-
-  // Layer 3: scene content
-  ctx.save();
-  switch (layout) {
-    case 'intro':      renderIntro(ctx, scene, theme, W, H, p, t, animStyle);     break;
-    case 'outro':      renderOutro(ctx, scene, theme, W, H, p, t, animStyle);     break;
-    case 'highlight':  renderHighlight(ctx, scene, theme, W, H, p, t, animStyle); break;
-    case 'list':       renderList(ctx, scene, theme, W, H, p, t, animStyle);      break;
-    case 'quote':      renderQuote(ctx, scene, theme, W, H, p, t, animStyle);     break;
-    default:           renderContent(ctx, scene, theme, W, H, p, t, animStyle);   break;
+  // ── Layer 2: Content overlay ─────────────────────────────────────────────
+  if (hasRealBg) {
+    // CINEMATIC MODE — video/image is the star; text is minimal
+    drawBottomGradient(ctx, W, H);
+    drawTopBar(ctx, W, H);
+    ctx.save();
+    if      (layout === 'intro') renderCinematicIntro(ctx, scene, theme, W, H, p, t, animStyle);
+    else if (layout === 'outro') renderCinematicOutro(ctx, scene, theme, W, H, p, t, animStyle);
+    else                         renderCinematicContent(ctx, scene, theme, W, H, p, t, animStyle);
+    ctx.restore();
+  } else {
+    // GRAPHIC MODE — text-based motion graphics (no real background)
+    drawAccents(ctx, theme, W, H, t, layout);
+    ctx.save();
+    switch (layout) {
+      case 'intro':     renderIntro(ctx, scene, theme, W, H, p, t, animStyle);     break;
+      case 'outro':     renderOutro(ctx, scene, theme, W, H, p, t, animStyle);     break;
+      case 'highlight': renderHighlight(ctx, scene, theme, W, H, p, t, animStyle); break;
+      case 'list':      renderList(ctx, scene, theme, W, H, p, t, animStyle);      break;
+      case 'quote':     renderQuote(ctx, scene, theme, W, H, p, t, animStyle);     break;
+      default:          renderContent(ctx, scene, theme, W, H, p, t, animStyle);   break;
+    }
+    ctx.restore();
   }
-  ctx.restore();
 
-  // Layer: Lower Third
+  // ── Layer 3: Overlays (both modes) ──────────────────────────────────────
   if (opts.lowerThird?.name) {
     drawLowerThird(ctx, opts.lowerThird.name, opts.lowerThird.title || '', W, H, p, theme);
   }
-
-  // Layer 4: captions
   if (opts.captions && scene?.narration) {
     renderCaptions(ctx, scene.narration, p, W, H);
   }
-
-  // Motion tracking reticle overlay
   if (opts.motionTracking) drawTrackingEffect(ctx, W, H, t, p);
+  if (opts.watermark)      drawWatermark(ctx, opts.watermark, W, H);
 
-  // Watermark
-  if (opts.watermark) drawWatermark(ctx, opts.watermark, W, H);
-
-  // Layer 5: HUD (only in preview, not exported video)
+  // ── Layer 4: HUD (preview only) ─────────────────────────────────────────
   if (!opts.export) {
-    drawScenePill(ctx, theme, sceneIndex + 1, totalScenes, W, t);
+    if (!hasRealBg) drawScenePill(ctx, theme, sceneIndex + 1, totalScenes, W, t);
     drawProgressBar(ctx, theme, W, H, p);
   }
 
