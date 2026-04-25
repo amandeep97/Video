@@ -12,7 +12,7 @@ export const FORMATS = {
   square:    { w: 450, h: 450, aspect: '1/1',   label: '1:1',  icon: '⬜' },
 };
 
-export default function VideoPreview({ script, currentScene, onSceneChange, voiceLang = 'en-US', videoFormat = 'landscape', showCaptions = false, musicStyle = 'none', customMusicUrl = null, animStyle = 'slide', filterStyle = 'none', styleEffect = 'none', motionTracking = false, watermark = '' }) {
+export default function VideoPreview({ script, currentScene, onSceneChange, voiceLang = 'en-US', videoFormat = 'landscape', showCaptions = false, musicStyle = 'none', customMusicUrl = null, animStyle = 'slide', filterStyle = 'none', styleEffect = 'none', motionTracking = false, watermark = '', falVideoUrls = null }) {
   const canvasRef     = useRef(null);
   const animFrameRef  = useRef(null);
   const videoEls      = useRef({});
@@ -37,6 +37,7 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
   // Load backgrounds when script changes
   useEffect(() => {
     if (!script?.scenes) return;
+    if (falVideoUrls?.length) return; // FAL videos take priority — handled by the effect below
     videoEls.current = {};
     imageEls.current = {};
     setLoadState({ type: 'idle', done: 0, total: 0 });
@@ -53,7 +54,27 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
         setLoadState({ type: 'ai', done, total });
       }).then(imgs => { imageEls.current = imgs; });
     }
-  }, [script]);
+  }, [script, falVideoUrls]);
+
+  // Use FAL.ai-generated video URLs when available
+  useEffect(() => {
+    if (!falVideoUrls?.length) return;
+    const els = {};
+    falVideoUrls.forEach((url, i) => {
+      if (!url) return;
+      const vid = document.createElement('video');
+      vid.src = url;
+      vid.crossOrigin = 'anonymous';
+      vid.muted = true;
+      vid.loop = true;
+      vid.preload = 'auto';
+      vid.load();
+      els[i] = vid;
+    });
+    videoEls.current = els;
+    imageEls.current = {};
+    setLoadState({ type: 'video', done: falVideoUrls.filter(Boolean).length, total: falVideoUrls.length });
+  }, [falVideoUrls]);
 
   useEffect(() => {
     Object.entries(videoEls.current).forEach(([i, v]) => { if (Number(i) !== currentScene) v.pause(); });

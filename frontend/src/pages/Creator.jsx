@@ -9,6 +9,7 @@ import {
 import { generateScript, regenerateScene } from '../services/api.js';
 import { hasValidKey, getSettings, PROVIDERS } from '../services/providers.js';
 import { VOICE_LANGUAGES, getElevenLabsSettings, saveVoiceLang } from '../services/tts.js';
+import { getFalKey, generateSceneVideo } from '../services/fal.js';
 import VideoPreview from '../components/VideoPreview.jsx';
 import SceneCard from '../components/SceneCard.jsx';
 import SceneEditor from '../components/SceneEditor.jsx';
@@ -104,6 +105,10 @@ export default function Creator() {
   const [styleEffect,          setStyleEffect]          = useState('none');
   const [motionTracking,       setMotionTracking]       = useState(false);
   const [watermark,            setWatermark]            = useState('');
+  const [falVideoUrls,         setFalVideoUrls]         = useState(null);
+  const [isGeneratingFal,      setIsGeneratingFal]      = useState(false);
+  const [falProgress,          setFalProgress]          = useState({ done: 0, total: 0 });
+  const [falError,             setFalError]             = useState('');
 
   // Modal state
   const [showApiKeyModal,    setShowApiKeyModal]    = useState(false);
@@ -111,6 +116,29 @@ export default function Creator() {
   const [hasApiKey,          setHasApiKey]          = useState(hasValidKey());
 
   const refreshKeyState = () => setHasApiKey(hasValidKey());
+
+  const handleGenerateFalVideos = async () => {
+    const falKey = getFalKey();
+    if (!falKey || !script) return;
+    setIsGeneratingFal(true);
+    setFalError('');
+    setFalVideoUrls(null);
+    const ar = videoFormat === 'portrait' ? '9:16' : videoFormat === 'square' ? '1:1' : '16:9';
+    const urls = [];
+    for (let i = 0; i < script.scenes.length; i++) {
+      setFalProgress({ done: i, total: script.scenes.length });
+      try {
+        const prompt = script.scenes[i].visualDescription || script.scenes[i].title;
+        urls.push(await generateSceneVideo(prompt, falKey, ar));
+      } catch (e) {
+        urls.push(null);
+        setFalError(`Scene ${i + 1} failed: ${e.message}`);
+      }
+    }
+    setFalProgress({ done: script.scenes.length, total: script.scenes.length });
+    setFalVideoUrls(urls);
+    setIsGeneratingFal(false);
+  };
 
   const handleTrackSelect = (track) => {
     setSelectedTrack(track);
@@ -617,17 +645,43 @@ export default function Creator() {
       </button>
 
       {script && (
-        <div className="flex gap-2">
-          <button onClick={() => setShowExporter(true)}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-brand-500/30 text-brand-400 hover:bg-brand-500/10 transition-all text-sm font-medium">
-            <Video className="w-4 h-4" />
-            Export as Video File (.webm)
-          </button>
-          <button onClick={() => { const c = document.querySelector('canvas'); if(!c) return; const a = document.createElement('a'); a.href=c.toDataURL('image/png'); a.download=`${(script?.title||'frame').replace(/\s+/g,'-').toLowerCase()}.png`; a.click(); }}
-            disabled={!script}
-            className="btn-secondary flex items-center gap-2 disabled:opacity-30 px-3">
-            📸 Thumbnail
-          </button>
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <button onClick={() => setShowExporter(true)}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-brand-500/30 text-brand-400 hover:bg-brand-500/10 transition-all text-sm font-medium">
+              <Video className="w-4 h-4" />
+              Export as Video File
+            </button>
+            <button onClick={() => { const c = document.querySelector('canvas'); if(!c) return; const a = document.createElement('a'); a.href=c.toDataURL('image/png'); a.download=`${(script?.title||'frame').replace(/\s+/g,'-').toLowerCase()}.png`; a.click(); }}
+              className="btn-secondary flex items-center gap-2 px-3 text-sm">
+              📸
+            </button>
+          </div>
+          {getFalKey() && (
+            <div className="space-y-1">
+              <button onClick={handleGenerateFalVideos} disabled={isGeneratingFal}
+                className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium transition-all border ${
+                  falVideoUrls ? 'bg-green-500/15 border-green-500/40 text-green-300' : 'bg-purple-500/15 border-purple-500/40 text-purple-300 hover:bg-purple-500/25'
+                } disabled:opacity-50`}>
+                {isGeneratingFal
+                  ? <><RefreshCw className="w-4 h-4 animate-spin" /> AI Video {falProgress.done}/{falProgress.total} scenes…</>
+                  : falVideoUrls
+                    ? <><Sparkles className="w-4 h-4" /> ✅ AI Backgrounds Ready — Regenerate</>
+                    : <><Sparkles className="w-4 h-4" /> Generate AI Video Backgrounds (FAL.ai)</>
+                }
+              </button>
+              {falError && <p className="text-[10px] text-red-400 text-center">{falError}</p>}
+              {falVideoUrls && !isGeneratingFal && (
+                <p className="text-[10px] text-green-400/70 text-center">Real AI video clips are now playing in the preview</p>
+              )}
+            </div>
+          )}
+          {!getFalKey() && (
+            <button onClick={() => setShowApiKeyModal(true)}
+              className="w-full text-center text-xs text-white/30 hover:text-white/60 transition-colors py-1">
+              🎬 Add FAL.ai key to generate real AI video backgrounds (~$0.05/scene)
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -636,7 +690,7 @@ export default function Creator() {
   // ── Preview panel ─────────────────────────────────────────────────────────
   const previewPanel = (
     <div className="space-y-4">
-      <VideoPreview script={script} currentScene={currentScene} onSceneChange={setCurrentScene} voiceLang={voiceLang} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} animStyle={animStyle} filterStyle={filterStyle} styleEffect={styleEffect} motionTracking={motionTracking} watermark={watermark} />
+      <VideoPreview script={script} currentScene={currentScene} onSceneChange={setCurrentScene} voiceLang={voiceLang} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} animStyle={animStyle} filterStyle={filterStyle} styleEffect={styleEffect} motionTracking={motionTracking} watermark={watermark} falVideoUrls={falVideoUrls} />
       {isGenerating && (
         <div className="glass rounded-xl p-5 text-center">
           <div className="animate-pulse space-y-3 mb-3">
@@ -852,7 +906,7 @@ export default function Creator() {
         <ApiKeyModal onClose={() => { setShowApiKeyModal(false); refreshKeyState(); }} />
       )}
       {showExporter && script && (
-        <VideoExporter script={script} onClose={() => setShowExporter(false)} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} voiceLang={voiceLang} animStyle={animStyle} filterStyle={filterStyle} styleEffect={styleEffect} motionTracking={motionTracking} watermark={watermark} />
+        <VideoExporter script={script} onClose={() => setShowExporter(false)} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} voiceLang={voiceLang} animStyle={animStyle} filterStyle={filterStyle} styleEffect={styleEffect} motionTracking={motionTracking} watermark={watermark} falVideoUrls={falVideoUrls} />
       )}
       {showMusicPicker && (
         <MusicPicker selectedTrack={selectedTrack} onSelect={handleTrackSelect} onClose={() => setShowMusicPicker(false)} />

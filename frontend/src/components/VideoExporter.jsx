@@ -120,7 +120,7 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageE
   });
 }
 
-export default function VideoExporter({ script, onClose, videoFormat = 'landscape', showCaptions = false, musicStyle = 'none', customMusicUrl = null, voiceLang = 'en-US', animStyle = 'slide', filterStyle = 'none', styleEffect = 'none', motionTracking = false, watermark = '' }) {
+export default function VideoExporter({ script, onClose, videoFormat = 'landscape', showCaptions = false, musicStyle = 'none', customMusicUrl = null, voiceLang = 'en-US', animStyle = 'slide', filterStyle = 'none', styleEffect = 'none', motionTracking = false, watermark = '', falVideoUrls = null }) {
   const [status,    setStatus]   = useState('idle');
   const [progress,  setProgress] = useState({ scene: 0, total: 0, pct: 0 });
   const [videoUrl,  setVideoUrl] = useState('');
@@ -135,7 +135,25 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
     setStatus('generating'); setErrMsg('');
     try {
       let videoEls = {}, imageEls = {};
-      if (pexelsKey) {
+      if (falVideoUrls?.length) {
+        // Use FAL.ai-generated videos — create <video> elements from URLs
+        setProgress({ scene: 0, total: script.scenes.length, pct: 0, phase: 'videos' });
+        await Promise.all(falVideoUrls.map((url, i) => {
+          if (!url) return Promise.resolve();
+          return new Promise(resolve => {
+            const vid = document.createElement('video');
+            vid.src = url;
+            vid.crossOrigin = 'anonymous';
+            vid.muted = true;
+            vid.loop = true;
+            vid.preload = 'auto';
+            vid.oncanplaythrough = () => resolve();
+            vid.onerror = () => resolve();
+            vid.load();
+            videoEls[i] = vid;
+          });
+        }));
+      } else if (pexelsKey) {
         setProgress({ scene: 0, total: script.scenes.length, pct: 0, phase: 'videos' });
         videoEls = await preloadSceneVideos(script.scenes, pexelsKey);
       } else {
@@ -196,8 +214,8 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-white/50">Background</span>
-                <span className={pexelsKey ? 'text-blue-400' : 'text-purple-400'}>
-                  {pexelsKey ? '🎬 Stock video (Pexels)' : '✨ AI-generated images (free)'}
+                <span className={falVideoUrls?.length ? 'text-purple-400' : pexelsKey ? 'text-blue-400' : 'text-purple-400'}>
+                  {falVideoUrls?.length ? '🤖 FAL.ai videos' : pexelsKey ? '🎬 Stock video (Pexels)' : '✨ AI-generated images (free)'}
                 </span>
               </div>
             </div>
