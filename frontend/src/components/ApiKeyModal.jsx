@@ -6,6 +6,7 @@ import { getPexelsKey, savePexelsKey } from '../services/pexels.js';
 import { getJamendoKey, saveJamendoKey } from '../services/jamendo.js';
 import { getFreesoundKey, saveFreesoundKey } from '../services/freesound.js';
 import { getFalKey, saveFalKey } from '../services/fal.js';
+import { getDidKey, saveDidKey } from '../services/did.js';
 
 export default function ApiKeyModal({ onClose }) {
   const current    = getSettings();
@@ -28,6 +29,8 @@ export default function ApiKeyModal({ onClose }) {
   const [showFs,        setShowFs]        = useState(false);
   const [falKey,        setFalKey]        = useState(getFalKey());
   const [showFal,       setShowFal]       = useState(false);
+  const [didKey,        setDidKey]        = useState(getDidKey());
+  const [showDid,       setShowDid]       = useState(false);
 
   const provider = PROVIDERS[selectedProvider];
 
@@ -45,6 +48,7 @@ export default function ApiKeyModal({ onClose }) {
     saveJamendoKey(jamendoKey);
     saveFreesoundKey(freesoundKey);
     saveFalKey(falKey);
+    saveDidKey(didKey);
     setSaved(true);
     setTimeout(() => { setSaved(false); onClose(); }, 700);
   };
@@ -211,6 +215,38 @@ export default function ApiKeyModal({ onClose }) {
                   <button type="button" onClick={() => setShowFal(s => !s)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white">
                     {showFal ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-white/10" />
+
+            {/* D-ID AI Avatar / Talking Photo */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🧑‍💼</span>
+                <div>
+                  <p className="text-sm font-semibold text-white">D-ID <span className="text-xs text-pink-400 font-normal">— AI Avatar / Talking Photo</span></p>
+                  <p className="text-xs text-white/40">Make a photo talk with your voice. ~$0.10/sec. Free trial available.</p>
+                </div>
+                {didKey && <span className="ml-auto w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />}
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-white/50">D-ID API Key</label>
+                  <a href="https://www.d-id.com" target="_blank" rel="noopener noreferrer"
+                    className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">
+                    Get free trial → d-id.com <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+                <div className="relative">
+                  <input type={showDid ? 'text' : 'password'} value={didKey}
+                    onChange={e => setDidKey(e.target.value)}
+                    placeholder="Paste your D-ID API key…" className="input-field pr-10 font-mono text-sm" />
+                  <button type="button" onClick={() => setShowDid(s => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white">
+                    {showDid ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
               </div>
