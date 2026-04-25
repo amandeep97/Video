@@ -569,11 +569,18 @@ export default function Creator() {
       </button>
 
       {script && (
-        <button onClick={() => setShowExporter(true)}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-brand-500/30 text-brand-400 hover:bg-brand-500/10 transition-all text-sm font-medium">
-          <Video className="w-4 h-4" />
-          Export as Video File (.webm)
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowExporter(true)}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-brand-500/30 text-brand-400 hover:bg-brand-500/10 transition-all text-sm font-medium">
+            <Video className="w-4 h-4" />
+            Export as Video File (.webm)
+          </button>
+          <button onClick={() => { const c = document.querySelector('canvas'); if(!c) return; const a = document.createElement('a'); a.href=c.toDataURL('image/png'); a.download=`${(script?.title||'frame').replace(/\s+/g,'-').toLowerCase()}.png`; a.click(); }}
+            disabled={!script}
+            className="btn-secondary flex items-center gap-2 disabled:opacity-30 px-3">
+            📸 Thumbnail
+          </button>
+        </div>
       )}
     </div>
   );
@@ -581,7 +588,7 @@ export default function Creator() {
   // ── Preview panel ─────────────────────────────────────────────────────────
   const previewPanel = (
     <div className="space-y-4">
-      <VideoPreview script={script} currentScene={currentScene} onSceneChange={setCurrentScene} voiceLang={voiceLang} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} animStyle={animStyle} />
+      <VideoPreview script={script} currentScene={currentScene} onSceneChange={setCurrentScene} voiceLang={voiceLang} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} animStyle={animStyle} filterStyle={filterStyle} watermark={watermark} />
       {isGenerating && (
         <div className="glass rounded-xl p-5 text-center">
           <div className="animate-pulse space-y-3 mb-3">
@@ -612,11 +619,18 @@ export default function Creator() {
         </div>
       )}
       {script && (
-        <button onClick={() => setShowExporter(true)}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-brand-500/30 text-brand-400 hover:bg-brand-500/10 transition-all text-sm font-medium">
-          <Video className="w-4 h-4" />
-          Export as Video File
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setShowExporter(true)}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-brand-500/30 text-brand-400 hover:bg-brand-500/10 transition-all text-sm font-medium">
+            <Video className="w-4 h-4" />
+            Export as Video File
+          </button>
+          <button onClick={() => { const c = document.querySelector('canvas'); if(!c) return; const a = document.createElement('a'); a.href=c.toDataURL('image/png'); a.download=`${(script?.title||'frame').replace(/\s+/g,'-').toLowerCase()}.png`; a.click(); }}
+            disabled={!script}
+            className="btn-secondary flex items-center gap-2 disabled:opacity-30 px-3">
+            📸 Thumbnail
+          </button>
+        </div>
       )}
     </div>
   );
@@ -790,7 +804,7 @@ export default function Creator() {
         <ApiKeyModal onClose={() => { setShowApiKeyModal(false); refreshKeyState(); }} />
       )}
       {showExporter && script && (
-        <VideoExporter script={script} onClose={() => setShowExporter(false)} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} voiceLang={voiceLang} animStyle={animStyle} />
+        <VideoExporter script={script} onClose={() => setShowExporter(false)} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} voiceLang={voiceLang} animStyle={animStyle} filterStyle={filterStyle} watermark={watermark} />
       )}
       {showMusicPicker && (
         <MusicPicker selectedTrack={selectedTrack} onSelect={handleTrackSelect} onClose={() => setShowMusicPicker(false)} />

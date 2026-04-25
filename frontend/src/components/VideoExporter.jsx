@@ -99,7 +99,7 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageE
     const tsBase = performance.now();
     for (let f = 0; f < frames; f++) {
       const progress = f / frames;
-      renderFrame(ctx, scene, script, si, scenes.length, progress, tsBase + (f / FPS) * 1000, bgVideo, bgImage, { captions: opts.captions, export: true, animStyle: opts.animStyle || 'slide' });
+      renderFrame(ctx, scene, script, si, scenes.length, progress, tsBase + (f / FPS) * 1000, bgVideo, bgImage, { captions: opts.captions, export: true, animStyle: opts.animStyle || 'slide', filterStyle: opts.filterStyle || 'none', watermark: opts.watermark || '', lowerThird: scene?.lowerThird });
       const elapsed  = performance.now() - startTime;
       const expected = (f / FPS) * 1000;
       if (expected > elapsed) await sleep(expected - elapsed);
@@ -144,7 +144,7 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
           setProgress(p => ({ ...p, scene: done, total, pct: (done / total) * 40 }));
         });
       }
-      const { blob, mimeType } = await generateVideoBlob(script, setProgress, withAudio, videoEls, imageEls, { format: videoFormat, captions: showCaptions, musicStyle, customMusicUrl, voiceLang, animStyle });
+      const { blob, mimeType } = await generateVideoBlob(script, setProgress, withAudio, videoEls, imageEls, { format: videoFormat, captions: showCaptions, musicStyle, customMusicUrl, voiceLang, animStyle, filterStyle, watermark });
       setVideoUrl(URL.createObjectURL(blob));
       setVideoMime(mimeType);
       setStatus('done');
