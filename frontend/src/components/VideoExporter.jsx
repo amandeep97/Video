@@ -99,7 +99,7 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageE
     const tsBase = performance.now();
     for (let f = 0; f < frames; f++) {
       const progress = f / frames;
-      renderFrame(ctx, scene, script, si, scenes.length, progress, tsBase + (f / FPS) * 1000, bgVideo, bgImage, { captions: opts.captions, export: true, animStyle: opts.animStyle || 'slide', filterStyle: opts.filterStyle || 'none', watermark: opts.watermark || '', lowerThird: scene?.lowerThird });
+      renderFrame(ctx, scene, script, si, scenes.length, progress, tsBase + (f / FPS) * 1000, bgVideo, bgImage, { captions: opts.captions, export: true, animStyle: opts.animStyle || 'slide', filterStyle: opts.filterStyle || 'none', styleEffect: opts.styleEffect || 'none', motionTracking: opts.motionTracking || false, watermark: opts.watermark || '', lowerThird: scene?.lowerThird });
       const elapsed  = performance.now() - startTime;
       const expected = (f / FPS) * 1000;
       if (expected > elapsed) await sleep(expected - elapsed);
@@ -120,7 +120,7 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageE
   });
 }
 
-export default function VideoExporter({ script, onClose, videoFormat = 'landscape', showCaptions = false, musicStyle = 'none', customMusicUrl = null, voiceLang = 'en-US', animStyle = 'slide', filterStyle = 'none', watermark = '' }) {
+export default function VideoExporter({ script, onClose, videoFormat = 'landscape', showCaptions = false, musicStyle = 'none', customMusicUrl = null, voiceLang = 'en-US', animStyle = 'slide', filterStyle = 'none', styleEffect = 'none', motionTracking = false, watermark = '' }) {
   const [status,    setStatus]   = useState('idle');
   const [progress,  setProgress] = useState({ scene: 0, total: 0, pct: 0 });
   const [videoUrl,  setVideoUrl] = useState('');
@@ -144,7 +144,7 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
           setProgress(p => ({ ...p, scene: done, total, pct: (done / total) * 40 }));
         });
       }
-      const { blob, mimeType } = await generateVideoBlob(script, setProgress, withAudio, videoEls, imageEls, { format: videoFormat, captions: showCaptions, musicStyle, customMusicUrl, voiceLang, animStyle, filterStyle, watermark });
+      const { blob, mimeType } = await generateVideoBlob(script, setProgress, withAudio, videoEls, imageEls, { format: videoFormat, captions: showCaptions, musicStyle, customMusicUrl, voiceLang, animStyle, filterStyle, styleEffect, motionTracking, watermark });
       setVideoUrl(URL.createObjectURL(blob));
       setVideoMime(mimeType);
       setStatus('done');

@@ -734,6 +734,41 @@ function renderQuote(ctx, scene, theme, W, H, p, t, animStyle) {
   }
 }
 
+// ── Motion tracking reticle overlay ─────────────────────────────────────────
+function drawTrackingEffect(ctx, W, H, t, p) {
+  if (p < 0.1 || p > 0.95) return;
+  ctx.save();
+  const alpha = 0.5 + Math.sin(t * 3) * 0.2;
+  // Draw scanning reticle in center
+  const cx = W / 2 + Math.sin(t * 0.3) * W * 0.08;
+  const cy = H / 2 + Math.cos(t * 0.25) * H * 0.06;
+  const size = 60 + Math.sin(t * 2) * 8;
+  ctx.strokeStyle = `rgba(0,255,100,${alpha * 0.7})`;
+  ctx.lineWidth = 1.5;
+  // Corner brackets reticle
+  const b = size / 2;
+  const bl = b * 0.35;
+  ctx.beginPath();
+  // top-left
+  ctx.moveTo(cx - b, cy - b + bl); ctx.lineTo(cx - b, cy - b); ctx.lineTo(cx - b + bl, cy - b);
+  // top-right
+  ctx.moveTo(cx + b - bl, cy - b); ctx.lineTo(cx + b, cy - b); ctx.lineTo(cx + b, cy - b + bl);
+  // bottom-right
+  ctx.moveTo(cx + b, cy + b - bl); ctx.lineTo(cx + b, cy + b); ctx.lineTo(cx + b - bl, cy + b);
+  // bottom-left
+  ctx.moveTo(cx - b + bl, cy + b); ctx.lineTo(cx - b, cy + b); ctx.lineTo(cx - b, cy + b - bl);
+  ctx.stroke();
+  // Center crosshair dot
+  ctx.fillStyle = `rgba(0,255,100,${alpha})`;
+  ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI * 2); ctx.fill();
+  // Small label
+  ctx.font = '8px monospace';
+  ctx.fillStyle = `rgba(0,255,100,${alpha * 0.8})`;
+  ctx.textAlign = 'left';
+  ctx.fillText('TRACKING', cx + b + 4, cy - b + 8);
+  ctx.restore();
+}
+
 // ── Main public render function ───────────────────────────────────────────────
 export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progress, timestamp, bgVideo = null, bgImage = null, opts = {}) {
   const W = ctx.canvas.width;
@@ -749,12 +784,23 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
   const p = clamp(progress, 0, 1);
   const animStyle = opts.animStyle || 'slide';
   const filterStyle = opts.filterStyle || 'none';
+  const styleEffect = opts.styleEffect || 'none';
   const layout   = detectLayout(scene, sceneIndex, totalScenes);
   const hasVideo = bgVideo && bgVideo.readyState >= 2;
   const hasImage = bgImage && bgImage.naturalWidth > 0;
 
-  // Apply B&W filter before background drawing
-  if (filterStyle === 'bw') ctx.filter = 'grayscale(1) contrast(1.05)';
+  // Build combined canvas filter (bw + styleEffect)
+  const styleFilters = {
+    cartoon: 'contrast(1.5) saturate(2.2)',
+    sketch:  'grayscale(1) contrast(2.5) brightness(1.15)',
+    neon:    'saturate(3) contrast(1.3) hue-rotate(15deg)',
+    oil:     'saturate(1.8) contrast(1.2) blur(0.4px)',
+    retro:   'sepia(0.6) contrast(1.3) saturate(0.8)',
+  };
+  let canvasFilter = '';
+  if (filterStyle === 'bw') canvasFilter += 'grayscale(1) contrast(1.05) ';
+  if (styleFilters[styleEffect]) canvasFilter += styleFilters[styleEffect];
+  if (canvasFilter.trim()) ctx.filter = canvasFilter.trim();
 
   // Layer 1: background — priority: video > AI image > gradient
   if (hasVideo) {
@@ -765,6 +811,9 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
     drawBackground(ctx, theme, W, H, t);
     drawParticles(ctx, theme, W, H, t);
   }
+
+  // Reset canvas filter before overlay draws so they aren't double-filtered
+  if (canvasFilter.trim()) ctx.filter = 'none';
 
   // Color filter overlay
   if (filterStyle !== 'none' && filterStyle !== 'bw') {
@@ -808,6 +857,9 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
     renderCaptions(ctx, scene.narration, p, W, H);
   }
 
+  // Motion tracking reticle overlay
+  if (opts.motionTracking) drawTrackingEffect(ctx, W, H, t, p);
+
   // Watermark
   if (opts.watermark) drawWatermark(ctx, opts.watermark, W, H);
 
@@ -817,6 +869,5 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
     drawProgressBar(ctx, theme, W, H, p);
   }
 
-  // Reset B&W filter
-  if (filterStyle === 'bw') ctx.filter = 'none';
+  ctx.filter = 'none';
 }

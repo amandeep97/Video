@@ -101,6 +101,8 @@ export default function Creator() {
   const [showVoiceCustomizer,  setShowVoiceCustomizer]  = useState(false);
   const [animStyle,            setAnimStyle]            = useState('slide');
   const [filterStyle,          setFilterStyle]          = useState('none');
+  const [styleEffect,          setStyleEffect]          = useState('none');
+  const [motionTracking,       setMotionTracking]       = useState(false);
   const [watermark,            setWatermark]            = useState('');
 
   // Modal state
@@ -268,6 +270,45 @@ export default function Creator() {
               <span className="text-[10px] text-white/60">{f.label}</span>
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Style Effect */}
+      <div>
+        <label className="text-sm text-white/50 mb-2 block font-medium">Style Effect</label>
+        <div className="flex gap-2 flex-wrap">
+          {[
+            { id: 'none',    icon: '✨', label: 'None' },
+            { id: 'cartoon', icon: '🎨', label: 'Cartoon' },
+            { id: 'sketch',  icon: '✏️', label: 'Sketch' },
+            { id: 'neon',    icon: '💡', label: 'Neon' },
+            { id: 'oil',     icon: '🖌️', label: 'Oil' },
+            { id: 'retro',   icon: '📺', label: 'Retro' },
+          ].map(e => (
+            <button key={e.id} onClick={() => setStyleEffect(e.id)}
+              className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all ${
+                styleEffect === e.id ? 'bg-brand-500/20 border-brand-500/50' : 'glass border-white/10'
+              }`}>
+              <span className="text-base">{e.icon}</span>
+              <span className="text-[10px] text-white/60">{e.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Motion Tracking FX */}
+      <div className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+        motionTracking ? 'bg-green-500/10 border-green-500/30' : 'glass border-white/10'
+      }`} onClick={() => setMotionTracking(m => !m)}>
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🎯</span>
+          <div>
+            <p className="text-sm font-medium">Motion Tracking FX</p>
+            <p className="text-xs text-white/40">Animated tracking reticle overlay</p>
+          </div>
+        </div>
+        <div className={`w-10 h-5 rounded-full transition-all ${motionTracking ? 'bg-green-500' : 'bg-white/20'}`}>
+          <div className={`w-4 h-4 rounded-full bg-white shadow mt-0.5 transition-transform ${motionTracking ? 'translate-x-5' : 'translate-x-0.5'}`} />
         </div>
       </div>
 
@@ -530,6 +571,13 @@ export default function Creator() {
                 placeholder="@yourhandle or brand name"
                 className="input-field text-sm" />
             </div>
+            <div className="flex items-center justify-between p-3 glass rounded-xl border border-white/10">
+              <div>
+                <p className="text-sm font-medium">🎙️ Voice Isolation</p>
+                <p className="text-xs text-white/40">Remove background noise from narration</p>
+              </div>
+              <div className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-1 rounded-full">Coming Soon</div>
+            </div>
           </div>
         )}
       </div>
@@ -588,7 +636,7 @@ export default function Creator() {
   // ── Preview panel ─────────────────────────────────────────────────────────
   const previewPanel = (
     <div className="space-y-4">
-      <VideoPreview script={script} currentScene={currentScene} onSceneChange={setCurrentScene} voiceLang={voiceLang} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} animStyle={animStyle} filterStyle={filterStyle} watermark={watermark} />
+      <VideoPreview script={script} currentScene={currentScene} onSceneChange={setCurrentScene} voiceLang={voiceLang} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} animStyle={animStyle} filterStyle={filterStyle} styleEffect={styleEffect} motionTracking={motionTracking} watermark={watermark} />
       {isGenerating && (
         <div className="glass rounded-xl p-5 text-center">
           <div className="animate-pulse space-y-3 mb-3">
@@ -804,7 +852,7 @@ export default function Creator() {
         <ApiKeyModal onClose={() => { setShowApiKeyModal(false); refreshKeyState(); }} />
       )}
       {showExporter && script && (
-        <VideoExporter script={script} onClose={() => setShowExporter(false)} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} voiceLang={voiceLang} animStyle={animStyle} filterStyle={filterStyle} watermark={watermark} />
+        <VideoExporter script={script} onClose={() => setShowExporter(false)} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} voiceLang={voiceLang} animStyle={animStyle} filterStyle={filterStyle} styleEffect={styleEffect} motionTracking={motionTracking} watermark={watermark} />
       )}
       {showMusicPicker && (
         <MusicPicker selectedTrack={selectedTrack} onSelect={handleTrackSelect} onClose={() => setShowMusicPicker(false)} />
