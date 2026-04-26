@@ -1031,5 +1031,17 @@ export function renderFrame(ctx, scene, script, sceneIndex, totalScenes, progres
     drawProgressBar(ctx, theme, W, H, p);
   }
 
+  // ── Layer 5: Scene fade transitions ─────────────────────────────────────
+  // Fade-in from black (first 7%) and fade-out to black (last 8%) every scene
+  if (opts.transition !== 'none') {
+    let fadeAlpha = 0;
+    if      (p < 0.07) fadeAlpha = 1 - easeOut(p / 0.07);
+    else if (p > 0.92) fadeAlpha = easeOut((p - 0.92) / 0.08);
+    if (fadeAlpha > 0.01) {
+      ctx.fillStyle = `rgba(0,0,0,${fadeAlpha})`;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
   ctx.filter = 'none';
 }

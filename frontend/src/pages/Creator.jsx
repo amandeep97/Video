@@ -10,6 +10,7 @@ import { generateScript, regenerateScene } from '../services/api.js';
 import { hasValidKey, getSettings, PROVIDERS } from '../services/providers.js';
 import { VOICE_LANGUAGES, getElevenLabsSettings, saveVoiceLang } from '../services/tts.js';
 import { getFalKey, generateSceneVideo } from '../services/fal.js';
+import { getPixabayKey } from '../services/pixabay.js';
 import VideoPreview from '../components/VideoPreview.jsx';
 import SceneCard from '../components/SceneCard.jsx';
 import SceneEditor from '../components/SceneEditor.jsx';
@@ -109,6 +110,9 @@ export default function Creator() {
   const [isGeneratingFal,      setIsGeneratingFal]      = useState(false);
   const [falProgress,          setFalProgress]          = useState({ done: 0, total: 0 });
   const [falError,             setFalError]             = useState('');
+  const [customBgUrl,          setCustomBgUrl]          = useState(null);
+  const [customBgType,         setCustomBgType]         = useState('image');
+  const [customBgName,         setCustomBgName]         = useState('');
 
   // Modal state
   const [showApiKeyModal,    setShowApiKeyModal]    = useState(false);
@@ -155,10 +159,39 @@ export default function Creator() {
 
   const currentProviderName = () => PROVIDERS[getSettings().providerId]?.name || 'AI';
 
+  // Auto-restore saved session on first load
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem('videoai_autosave');
+      if (saved && !searchParams.get('topic')) {
+        const d = JSON.parse(saved);
+        if (d.script) setScript(d.script);
+        if (d.topic) setTopic(d.topic);
+        if (d.style) setStyle(d.style);
+        if (d.duration) setDuration(d.duration);
+        if (d.voiceLang) setVoiceLang(d.voiceLang);
+        if (d.videoFormat) setVideoFormat(d.videoFormat);
+        if (d.showCaptions !== undefined) setShowCaptions(d.showCaptions);
+        if (d.animStyle) setAnimStyle(d.animStyle);
+        if (d.filterStyle) setFilterStyle(d.filterStyle);
+        if (d.styleEffect) setStyleEffect(d.styleEffect);
+        if (d.watermark) setWatermark(d.watermark);
+      }
+    } catch {}
     if (searchParams.get('topic') && hasValidKey()) handleGenerate();
     else if (searchParams.get('topic') && !hasValidKey()) setShowApiKeyModal(true);
   }, []);
+
+  // Auto-save whenever script or key settings change
+  useEffect(() => {
+    if (!script) return;
+    try {
+      localStorage.setItem('videoai_autosave', JSON.stringify({
+        script, topic, style, duration, voiceLang, videoFormat,
+        showCaptions, animStyle, filterStyle, styleEffect, watermark,
+      }));
+    } catch {}
+  }, [script, topic, style, duration, voiceLang, videoFormat, showCaptions, animStyle, filterStyle, styleEffect, watermark]);
 
   const handleGenerate = useCallback(async () => {
     if (!topic.trim())   { setError('Please enter a topic'); return; }
@@ -599,6 +632,41 @@ export default function Creator() {
                 placeholder="@yourhandle or brand name"
                 className="input-field text-sm" />
             </div>
+            <div>
+              <label className="text-xs text-white/50 mb-1.5 block">Custom Background (all scenes)</label>
+              <label className="block cursor-pointer">
+                <div className={`flex items-center gap-2.5 p-3 rounded-xl border-2 border-dashed transition-all ${
+                  customBgUrl ? 'border-green-500/40 bg-green-500/8' : 'border-white/10 hover:border-white/20'
+                }`}>
+                  <span className="text-base">{customBgUrl ? (customBgType === 'video' ? '🎥' : '🖼️') : '📁'}</span>
+                  <div className="flex-1 min-w-0">
+                    {customBgUrl ? (
+                      <>
+                        <p className="text-xs font-medium text-green-400">Custom {customBgType} set</p>
+                        <p className="text-[10px] text-white/40 truncate">{customBgName}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs font-medium text-white/60">Upload your image or video</p>
+                        <p className="text-[10px] text-white/30">JPG, PNG, MP4, WebM — used as background for all scenes</p>
+                      </>
+                    )}
+                  </div>
+                  {customBgUrl && (
+                    <button type="button" onClick={e => { e.preventDefault(); URL.revokeObjectURL(customBgUrl); setCustomBgUrl(null); setCustomBgName(''); }}
+                      className="text-white/30 hover:text-red-400 text-xs px-1 flex-shrink-0">✕</button>
+                  )}
+                </div>
+                <input type="file" accept="image/*,video/*" className="hidden" onChange={e => {
+                  const file = e.target.files[0];
+                  if (!file) return;
+                  if (customBgUrl) URL.revokeObjectURL(customBgUrl);
+                  setCustomBgType(file.type.startsWith('video') ? 'video' : 'image');
+                  setCustomBgUrl(URL.createObjectURL(file));
+                  setCustomBgName(file.name);
+                }} />
+              </label>
+            </div>
             <div className="flex items-center justify-between p-3 glass rounded-xl border border-white/10">
               <div>
                 <p className="text-sm font-medium">🎙️ Voice Isolation</p>
@@ -690,7 +758,7 @@ export default function Creator() {
   // ── Preview panel ─────────────────────────────────────────────────────────
   const previewPanel = (
     <div className="space-y-4">
-      <VideoPreview script={script} currentScene={currentScene} onSceneChange={setCurrentScene} voiceLang={voiceLang} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} animStyle={animStyle} filterStyle={filterStyle} styleEffect={styleEffect} motionTracking={motionTracking} watermark={watermark} falVideoUrls={falVideoUrls} />
+      <VideoPreview script={script} currentScene={currentScene} onSceneChange={setCurrentScene} voiceLang={voiceLang} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} animStyle={animStyle} filterStyle={filterStyle} styleEffect={styleEffect} motionTracking={motionTracking} watermark={watermark} falVideoUrls={falVideoUrls} customBgUrl={customBgUrl} customBgType={customBgType} />
       {isGenerating && (
         <div className="glass rounded-xl p-5 text-center">
           <div className="animate-pulse space-y-3 mb-3">
@@ -906,7 +974,7 @@ export default function Creator() {
         <ApiKeyModal onClose={() => { setShowApiKeyModal(false); refreshKeyState(); }} />
       )}
       {showExporter && script && (
-        <VideoExporter script={script} onClose={() => setShowExporter(false)} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} voiceLang={voiceLang} animStyle={animStyle} filterStyle={filterStyle} styleEffect={styleEffect} motionTracking={motionTracking} watermark={watermark} falVideoUrls={falVideoUrls} />
+        <VideoExporter script={script} onClose={() => setShowExporter(false)} videoFormat={videoFormat} showCaptions={showCaptions} musicStyle={musicStyle} customMusicUrl={customMusicUrl} voiceLang={voiceLang} animStyle={animStyle} filterStyle={filterStyle} styleEffect={styleEffect} motionTracking={motionTracking} watermark={watermark} falVideoUrls={falVideoUrls} customBgUrl={customBgUrl} customBgType={customBgType} />
       )}
       {showMusicPicker && (
         <MusicPicker selectedTrack={selectedTrack} onSelect={handleTrackSelect} onClose={() => setShowMusicPicker(false)} />

@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { X, Download, Video, Loader2, CheckCircle, AlertCircle, Mic, MicOff, Film, Sparkles } from 'lucide-react';
 import { getAudioBlob, getElevenLabsSettings, getVoiceSettings } from '../services/tts.js';
 import { renderFrame } from '../services/videoRenderer.js';
-import { preloadSceneVideos, getPexelsKey } from '../services/pexels.js';
+import { preloadSceneVideos, getPexelsKey, makeVideoEl } from '../services/pexels.js';
 import { preloadSceneImages } from '../services/pollinations.js';
+import { getPixabayKey, preloadSceneVideosPixabay, preloadSceneImagesPixabay } from '../services/pixabay.js';
 import { startMusic } from '../services/musicGenerator.js';
 import { FORMATS } from './VideoPreview.jsx';
 
@@ -99,7 +100,7 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageE
     const tsBase = performance.now();
     for (let f = 0; f < frames; f++) {
       const progress = f / frames;
-      renderFrame(ctx, scene, script, si, scenes.length, progress, tsBase + (f / FPS) * 1000, bgVideo, bgImage, { captions: opts.captions, export: true, animStyle: opts.animStyle || 'slide', filterStyle: opts.filterStyle || 'none', styleEffect: opts.styleEffect || 'none', motionTracking: opts.motionTracking || false, watermark: opts.watermark || '', lowerThird: scene?.lowerThird });
+      renderFrame(ctx, scene, script, si, scenes.length, progress, tsBase + (f / FPS) * 1000, bgVideo, bgImage, { captions: opts.captions, export: true, transition: 'fade', animStyle: opts.animStyle || 'slide', filterStyle: opts.filterStyle || 'none', styleEffect: opts.styleEffect || 'none', motionTracking: opts.motionTracking || false, watermark: opts.watermark || '', lowerThird: scene?.lowerThird });
       const elapsed  = performance.now() - startTime;
       const expected = (f / FPS) * 1000;
       if (expected > elapsed) await sleep(expected - elapsed);
@@ -120,7 +121,7 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageE
   });
 }
 
-export default function VideoExporter({ script, onClose, videoFormat = 'landscape', showCaptions = false, musicStyle = 'none', customMusicUrl = null, voiceLang = 'en-US', animStyle = 'slide', filterStyle = 'none', styleEffect = 'none', motionTracking = false, watermark = '', falVideoUrls = null }) {
+export default function VideoExporter({ script, onClose, videoFormat = 'landscape', showCaptions = false, musicStyle = 'none', customMusicUrl = null, voiceLang = 'en-US', animStyle = 'slide', filterStyle = 'none', styleEffect = 'none', motionTracking = false, watermark = '', falVideoUrls = null, customBgUrl = null, customBgType = 'image' }) {
   const [status,    setStatus]   = useState('idle');
   const [progress,  setProgress] = useState({ scene: 0, total: 0, pct: 0 });
   const [videoUrl,  setVideoUrl] = useState('');
@@ -128,7 +129,8 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
   const [withAudio, setWithAudio]= useState(true);
   const [errMsg,    setErrMsg]   = useState('');
   const { apiKey: elKey } = getElevenLabsSettings();
-  const pexelsKey = getPexelsKey();
+  const pexelsKey  = getPexelsKey();
+  const pixabayKey = getPixabayKey();
   const { provider: voiceProvider } = getVoiceSettings();
 
   const handleGenerate = async () => {
@@ -153,9 +155,31 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
             videoEls[i] = vid;
           });
         }));
+      } else if (customBgUrl) {
+        const total = script.scenes.length;
+        if (customBgType === 'video') {
+          const vid = makeVideoEl(customBgUrl);
+          for (let i = 0; i < total; i++) videoEls[i] = vid;
+        } else {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.src = customBgUrl;
+          await new Promise(r => { img.onload = r; img.onerror = r; });
+          for (let i = 0; i < total; i++) imageEls[i] = img;
+        }
       } else if (pexelsKey) {
         setProgress({ scene: 0, total: script.scenes.length, pct: 0, phase: 'videos' });
         videoEls = await preloadSceneVideos(script.scenes, pexelsKey);
+      } else if (pixabayKey) {
+        setProgress({ scene: 0, total: script.scenes.length, pct: 0, phase: 'videos' });
+        const pxVids = await preloadSceneVideosPixabay(script.scenes, pixabayKey);
+        if (Object.keys(pxVids).length > 0) {
+          videoEls = pxVids;
+        } else {
+          imageEls = await preloadSceneImagesPixabay(script.scenes, pixabayKey, (done, total) => {
+            setProgress(p => ({ ...p, scene: done, total, pct: (done / total) * 40 }));
+          });
+        }
       } else {
         setProgress({ scene: 0, total: script.scenes.length, pct: 0, phase: 'ai-images' });
         imageEls = await preloadSceneImages(script.scenes, script.style, (done, total) => {
@@ -214,8 +238,8 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-white/50">Background</span>
-                <span className={falVideoUrls?.length ? 'text-purple-400' : pexelsKey ? 'text-blue-400' : 'text-purple-400'}>
-                  {falVideoUrls?.length ? '🤖 FAL.ai videos' : pexelsKey ? '🎬 Stock video (Pexels)' : '✨ AI-generated images (free)'}
+                <span className={falVideoUrls?.length ? 'text-purple-400' : customBgUrl ? 'text-green-400' : pexelsKey ? 'text-blue-400' : pixabayKey ? 'text-yellow-400' : 'text-purple-400'}>
+                  {falVideoUrls?.length ? '🤖 FAL.ai videos' : customBgUrl ? `📁 Your ${customBgType}` : pexelsKey ? '🎬 Pexels stock video' : pixabayKey ? '🖼️ Pixabay stock' : '✨ AI images (free)'}
                 </span>
               </div>
             </div>

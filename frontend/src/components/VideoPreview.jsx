@@ -2,8 +2,9 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Sparkles, Film } from 'lucide-react';
 import { speakBrowser, getElevenLabsSettings, getAudioBlob } from '../services/tts.js';
 import { renderFrame } from '../services/videoRenderer.js';
-import { preloadSceneVideos, getPexelsKey } from '../services/pexels.js';
+import { preloadSceneVideos, getPexelsKey, makeVideoEl } from '../services/pexels.js';
 import { preloadSceneImages } from '../services/pollinations.js';
+import { getPixabayKey, preloadSceneVideosPixabay, preloadSceneImagesPixabay } from '../services/pixabay.js';
 import { startMusic } from '../services/musicGenerator.js';
 
 export const FORMATS = {
@@ -12,7 +13,7 @@ export const FORMATS = {
   square:    { w: 450, h: 450, aspect: '1/1',   label: '1:1',  icon: '⬜' },
 };
 
-export default function VideoPreview({ script, currentScene, onSceneChange, voiceLang = 'en-US', videoFormat = 'landscape', showCaptions = false, musicStyle = 'none', customMusicUrl = null, animStyle = 'slide', filterStyle = 'none', styleEffect = 'none', motionTracking = false, watermark = '', falVideoUrls = null }) {
+export default function VideoPreview({ script, currentScene, onSceneChange, voiceLang = 'en-US', videoFormat = 'landscape', showCaptions = false, musicStyle = 'none', customMusicUrl = null, animStyle = 'slide', filterStyle = 'none', styleEffect = 'none', motionTracking = false, watermark = '', falVideoUrls = null, customBgUrl = null, customBgType = 'image' }) {
   const canvasRef     = useRef(null);
   const animFrameRef  = useRef(null);
   const videoEls      = useRef({});
@@ -37,16 +38,31 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
   // Load backgrounds when script changes
   useEffect(() => {
     if (!script?.scenes) return;
-    if (falVideoUrls?.length) return; // FAL videos take priority — handled by the effect below
+    if (falVideoUrls?.length) return;
+    if (customBgUrl) return;
     videoEls.current = {};
     imageEls.current = {};
     setLoadState({ type: 'idle', done: 0, total: 0 });
-    const pexelsKey = getPexelsKey();
+    const pexelsKey  = getPexelsKey();
+    const pixabayKey = getPixabayKey();
     if (pexelsKey) {
       setLoadState({ type: 'video', done: 0, total: script.scenes.length });
       preloadSceneVideos(script.scenes, pexelsKey).then(els => {
         videoEls.current = els;
         setLoadState({ type: 'video', done: script.scenes.length, total: script.scenes.length });
+      });
+    } else if (pixabayKey) {
+      setLoadState({ type: 'video', done: 0, total: script.scenes.length });
+      preloadSceneVideosPixabay(script.scenes, pixabayKey).then(els => {
+        if (Object.keys(els).length > 0) {
+          videoEls.current = els;
+          setLoadState({ type: 'video', done: script.scenes.length, total: script.scenes.length });
+        } else {
+          // Fallback to Pixabay images
+          preloadSceneImagesPixabay(script.scenes, pixabayKey, (done, total) => {
+            setLoadState({ type: 'ai', done, total });
+          }).then(imgs => { imageEls.current = imgs; });
+        }
       });
     } else {
       setLoadState({ type: 'ai', done: 0, total: script.scenes.length });
@@ -54,7 +70,31 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
         setLoadState({ type: 'ai', done, total });
       }).then(imgs => { imageEls.current = imgs; });
     }
-  }, [script, falVideoUrls]);
+  }, [script, falVideoUrls, customBgUrl]);
+
+  // Use uploaded custom background for all scenes
+  useEffect(() => {
+    if (!customBgUrl || !script?.scenes) return;
+    const total = script.scenes.length;
+    if (customBgType === 'video') {
+      const vid = makeVideoEl(customBgUrl);
+      const els = {};
+      for (let i = 0; i < total; i++) els[i] = vid;
+      videoEls.current = els;
+      imageEls.current = {};
+    } else {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = customBgUrl;
+      img.onload = () => {
+        const els = {};
+        for (let i = 0; i < total; i++) els[i] = img;
+        imageEls.current = els;
+        videoEls.current = {};
+      };
+    }
+    setLoadState({ type: 'video', done: total, total });
+  }, [customBgUrl, customBgType, script]);
 
   // Use FAL.ai-generated video URLs when available
   useEffect(() => {
@@ -157,7 +197,7 @@ export default function VideoPreview({ script, currentScene, onSceneChange, voic
       const bgImage = imageEls.current[sceneIndexRef.current] || null;
 
       if (scene) {
-        renderFrame(ctx, scene, script, sceneIndexRef.current, totalScenes, p, timestamp, bgVideo, bgImage, { captions: showCaptions, animStyle, filterStyle, styleEffect, motionTracking, watermark, lowerThird: scene?.lowerThird });
+        renderFrame(ctx, scene, script, sceneIndexRef.current, totalScenes, p, timestamp, bgVideo, bgImage, { captions: showCaptions, animStyle, filterStyle, styleEffect, motionTracking, watermark, lowerThird: scene?.lowerThird, transition: 'fade' });
         if (isSpeaking) {
           const W = canvas.width, H = canvas.height;
           ctx.save();
