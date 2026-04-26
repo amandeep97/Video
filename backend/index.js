@@ -164,6 +164,144 @@ Respond with JSON only: {"headline": "short punchy headline", "subtext": "suppor
   }
 });
 
+// ── Replicate proxy routes ────────────────────────────────────────────────────
+// These let you call Replicate with REPLICATE_API_TOKEN from .env instead of
+// storing the key in the browser. Frontend can hit /api/generate-video instead
+// of calling Replicate directly.
+
+const REPLICATE_BASE = 'https://api.replicate.com/v1';
+
+async function replicatePost(path, body, token) {
+  const res = await fetch(`${REPLICATE_BASE}${path}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': 'wait=10' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Replicate ${res.status}`);
+  }
+  return res.json();
+}
+
+async function replicateGet(path, token) {
+  const res = await fetch(`${REPLICATE_BASE}${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return res.json();
+}
+
+/**
+ * POST /api/generate-video
+ * Body: { prompt, model, aspectRatio }
+ * model: 'wan22' | 'ltx' | 'mochi'
+ * Returns: { id, status, output? }
+ */
+app.post('/api/generate-video', async (req, res) => {
+  const token = process.env.REPLICATE_API_TOKEN;
+  if (!token) return res.status(500).json({ error: 'REPLICATE_API_TOKEN not set in .env' });
+
+  const { prompt, model = 'ltx', aspectRatio = '16:9' } = req.body;
+  if (!prompt) return res.status(400).json({ error: 'prompt is required' });
+
+  const MODELS = {
+    wan22: { owner: 'wavymulder', name: 'wan2.2',
+      input: () => ({ prompt, num_frames: 81, fps: 16, aspect_ratio: aspectRatio, guidance_scale: 5.0, num_inference_steps: 30 }) },
+    ltx:   { owner: 'lightricks', name: 'ltx-video',
+      input: () => ({ prompt, num_frames: 49, frame_rate: 24,
+        width: aspectRatio === '9:16' ? 480 : 704, height: aspectRatio === '9:16' ? 704 : 480 }) },
+    mochi: { owner: 'genmo', name: 'mochi-1',
+      input: () => ({ prompt, num_frames: 84, fps: 30 }) },
+  };
+
+  const m = MODELS[model] || MODELS.ltx;
+  try {
+    const prediction = await replicatePost(
+      `/models/${m.owner}/${m.name}/predictions`,
+      { input: m.input() }, token,
+    );
+    // If already done (Prefer: wait=10 returned result)
+    if (prediction.output) {
+      const url = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
+      return res.json({ id: prediction.id, status: 'succeeded', output: url });
+    }
+    res.json({ id: prediction.id, status: prediction.status });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * GET /api/generate-video/:id
+ * Poll for prediction status.
+ * Returns: { id, status, output? }
+ */
+app.get('/api/generate-video/:id', async (req, res) => {
+  const token = process.env.REPLICATE_API_TOKEN;
+  if (!token) return res.status(500).json({ error: 'REPLICATE_API_TOKEN not set' });
+  try {
+    const data = await replicateGet(`/predictions/${req.params.id}`, token);
+    const out = data.output;
+    res.json({
+      id: data.id,
+      status: data.status,
+      output: out ? (Array.isArray(out) ? out[0] : out) : null,
+      error: data.error || null,
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /api/generate-avatar
+ * Body: { imageDataUrl, audioDataUrl }
+ * Uses SadTalker to animate a portrait photo with audio.
+ * Returns: { id, status, output? }
+ */
+app.post('/api/generate-avatar', async (req, res) => {
+  const token = process.env.REPLICATE_API_TOKEN;
+  if (!token) return res.status(500).json({ error: 'REPLICATE_API_TOKEN not set in .env' });
+
+  const { imageDataUrl, audioDataUrl } = req.body;
+  if (!imageDataUrl || !audioDataUrl) return res.status(400).json({ error: 'imageDataUrl and audioDataUrl are required' });
+
+  try {
+    const prediction = await replicatePost('/models/cjwbw/sadtalker/predictions', {
+      input: {
+        source_image: imageDataUrl,
+        driven_audio: audioDataUrl,
+        preprocess: 'crop',
+        still_mode: false,
+        use_enhancer: true,
+        size_of_image: 256,
+        pose_style: 0,
+        expression_scale: 1.0,
+      },
+    }, token);
+
+    if (prediction.output) return res.json({ id: prediction.id, status: 'succeeded', output: prediction.output });
+    res.json({ id: prediction.id, status: prediction.status });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * GET /api/generate-avatar/:id
+ * Poll for avatar generation status.
+ */
+app.get('/api/generate-avatar/:id', async (req, res) => {
+  const token = process.env.REPLICATE_API_TOKEN;
+  if (!token) return res.status(500).json({ error: 'REPLICATE_API_TOKEN not set' });
+  try {
+    const data = await replicateGet(`/predictions/${req.params.id}`, token);
+    res.json({ id: data.id, status: data.status, output: data.output || null, error: data.error || null });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

@@ -18,6 +18,8 @@ import ApiKeyModal from '../components/ApiKeyModal.jsx';
 import VideoExporter from '../components/VideoExporter.jsx';
 import MusicPicker from '../components/MusicPicker.jsx';
 import VoiceCustomizer from '../components/VoiceCustomizer.jsx';
+import AiVideoGenerator from '../components/AiVideoGenerator.jsx';
+import AiAvatarGenerator from '../components/AiAvatarGenerator.jsx';
 
 // ── Stable components defined OUTSIDE Creator to prevent remount on re-render ──
 
@@ -113,6 +115,8 @@ export default function Creator() {
   const [customBgUrl,          setCustomBgUrl]          = useState(null);
   const [customBgType,         setCustomBgType]         = useState('image');
   const [customBgName,         setCustomBgName]         = useState('');
+  const [showAiVideo,          setShowAiVideo]          = useState(false);
+  const [showAiAvatar,         setShowAiAvatar]         = useState(false);
 
   // Modal state
   const [showApiKeyModal,    setShowApiKeyModal]    = useState(false);
@@ -142,6 +146,14 @@ export default function Creator() {
     setFalProgress({ done: script.scenes.length, total: script.scenes.length });
     setFalVideoUrls(urls);
     setIsGeneratingFal(false);
+  };
+
+  const handleVideoReady = (sceneIndex, url) => {
+    setFalVideoUrls(prev => {
+      const next = prev ? [...prev] : Array(script?.scenes?.length || 0).fill(null);
+      next[sceneIndex] = url;
+      return next;
+    });
   };
 
   const handleTrackSelect = (track) => {
@@ -789,17 +801,30 @@ export default function Creator() {
         </div>
       )}
       {script && (
-        <div className="flex gap-2">
-          <button onClick={() => setShowExporter(true)}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-brand-500/30 text-brand-400 hover:bg-brand-500/10 transition-all text-sm font-medium">
-            <Video className="w-4 h-4" />
-            Export as Video File
-          </button>
-          <button onClick={() => { const c = document.querySelector('canvas'); if(!c) return; const a = document.createElement('a'); a.href=c.toDataURL('image/png'); a.download=`${(script?.title||'frame').replace(/\s+/g,'-').toLowerCase()}.png`; a.click(); }}
-            disabled={!script}
-            className="btn-secondary flex items-center gap-2 disabled:opacity-30 px-3">
-            📸 Thumbnail
-          </button>
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <button onClick={() => setShowExporter(true)}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border border-brand-500/30 text-brand-400 hover:bg-brand-500/10 transition-all text-sm font-medium">
+              <Video className="w-4 h-4" />
+              Export as Video File
+            </button>
+            <button onClick={() => { const c = document.querySelector('canvas'); if(!c) return; const a = document.createElement('a'); a.href=c.toDataURL('image/png'); a.download=`${(script?.title||'frame').replace(/\s+/g,'-').toLowerCase()}.png`; a.click(); }}
+              disabled={!script}
+              className="btn-secondary flex items-center gap-2 disabled:opacity-30 px-3">
+              📸 Thumbnail
+            </button>
+          </div>
+          {/* AI Generate + AI Avatar buttons */}
+          <div className="flex gap-2">
+            <button onClick={() => setShowAiVideo(true)}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-purple-500/30 text-purple-300 hover:bg-purple-500/10 transition-all text-sm font-medium">
+              <Sparkles className="w-4 h-4" /> AI Generate
+            </button>
+            <button onClick={() => setShowAiAvatar(true)}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-pink-500/30 text-pink-300 hover:bg-pink-500/10 transition-all text-sm font-medium">
+              👤 AI Avatar
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -981,6 +1006,24 @@ export default function Creator() {
       )}
       {showVoiceCustomizer && (
         <VoiceCustomizer voiceLang={voiceLang} onClose={() => setShowVoiceCustomizer(false)} onLangChange={lang => { setVoiceLang(lang); saveVoiceLang(lang); }} />
+      )}
+      {showAiVideo && script && (
+        <AiVideoGenerator
+          scene={script.scenes[currentScene]}
+          sceneIndex={currentScene}
+          videoFormat={videoFormat}
+          onVideoReady={handleVideoReady}
+          onClose={() => setShowAiVideo(false)}
+        />
+      )}
+      {showAiAvatar && script && (
+        <AiAvatarGenerator
+          scene={script.scenes[currentScene]}
+          sceneIndex={currentScene}
+          voiceLang={voiceLang}
+          onVideoReady={handleVideoReady}
+          onClose={() => setShowAiAvatar(false)}
+        />
       )}
     </div>
   );

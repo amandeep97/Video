@@ -8,6 +8,7 @@ import { getJamendoKey, saveJamendoKey } from '../services/jamendo.js';
 import { getFreesoundKey, saveFreesoundKey } from '../services/freesound.js';
 import { getFalKey, saveFalKey } from '../services/fal.js';
 import { getDidKey, saveDidKey } from '../services/did.js';
+import { getReplicateKey, saveReplicateKey } from '../services/replicate.js';
 
 export default function ApiKeyModal({ onClose }) {
   const current    = getSettings();
@@ -30,10 +31,12 @@ export default function ApiKeyModal({ onClose }) {
   const [showJm,        setShowJm]        = useState(false);
   const [freesoundKey,  setFreesoundKey]  = useState(getFreesoundKey());
   const [showFs,        setShowFs]        = useState(false);
-  const [falKey,        setFalKey]        = useState(getFalKey());
-  const [showFal,       setShowFal]       = useState(false);
-  const [didKey,        setDidKey]        = useState(getDidKey());
-  const [showDid,       setShowDid]       = useState(false);
+  const [falKey,          setFalKey]          = useState(getFalKey());
+  const [showFal,         setShowFal]         = useState(false);
+  const [didKey,          setDidKey]          = useState(getDidKey());
+  const [showDid,         setShowDid]         = useState(false);
+  const [replicateKey,    setReplicateKey]    = useState(getReplicateKey());
+  const [showReplicate,   setShowReplicate]   = useState(false);
 
   const provider = PROVIDERS[selectedProvider];
 
@@ -53,6 +56,7 @@ export default function ApiKeyModal({ onClose }) {
     saveFreesoundKey(freesoundKey);
     saveFalKey(falKey);
     saveDidKey(didKey);
+    saveReplicateKey(replicateKey);
     setSaved(true);
     setTimeout(() => { setSaved(false); onClose(); }, 700);
   };
@@ -254,6 +258,39 @@ export default function ApiKeyModal({ onClose }) {
                     {showFal ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+              </div>
+            </div>
+
+            <div className="border-t border-white/10" />
+
+            {/* Replicate — Wan2.2 + SadTalker */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🎬</span>
+                <div>
+                  <p className="text-sm font-semibold text-white">Replicate <span className="text-xs text-purple-400 font-normal">— Wan2.2 · LTX · SadTalker Avatar</span></p>
+                  <p className="text-xs text-white/40">Run Wan2.2 video generation + talking avatar. Pay-as-you-go (~$0.05–0.30/video). Free $1 credit on signup.</p>
+                </div>
+                {replicateKey && <span className="ml-auto w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />}
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-white/50">Replicate API Key</label>
+                  <a href="https://replicate.com/account/api-tokens" target="_blank" rel="noopener noreferrer"
+                    className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">
+                    Get free key <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+                <div className="relative">
+                  <input type={showReplicate ? 'text' : 'password'} value={replicateKey}
+                    onChange={e => setReplicateKey(e.target.value)}
+                    placeholder="r8_..." className="input-field pr-10 font-mono text-sm" />
+                  <button type="button" onClick={() => setShowReplicate(s => !s)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white">
+                    {showReplicate ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-white/30 mt-1">replicate.com → Sign in → Account → API tokens → Create token</p>
               </div>
             </div>
 
