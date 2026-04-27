@@ -86,17 +86,28 @@ async function poll(id, key, onStatus) {
   throw new Error('Timeout — generation took too long');
 }
 
+// ── Avatar models ─────────────────────────────────────────────────────────────
+export const AVATAR_MODELS = [
+  {
+    id: 'sadtalker',
+    label: 'SadTalker',
+    badge: 'Classic',
+    badgeColor: 'text-pink-400 border-pink-500/30 bg-pink-500/10',
+    cost: '~$0.15/video',
+    desc: 'Natural head motion, good expression',
+  },
+  {
+    id: 'wav2lip',
+    label: 'Wav2Lip',
+    badge: 'Best Lip Sync',
+    badgeColor: 'text-orange-400 border-orange-500/30 bg-orange-500/10',
+    cost: '~$0.10/video',
+    desc: 'Sharper lip sync accuracy',
+  },
+];
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
-/**
- * Generate a video clip from a text prompt.
- * @param {string} prompt
- * @param {string} modelId  one of VIDEO_MODELS[].id
- * @param {string} aspectRatio  '16:9' | '9:16' | '1:1'
- * @param {string} key  Replicate API key
- * @param {(status:string, pct:number) => void} onStatus
- * @returns {Promise<string>}  URL of generated video
- */
 export async function generateVideo(prompt, modelId, aspectRatio, key, onStatus) {
   if (!key) throw new Error('No Replicate API key — add it in Settings → Video');
   const model = VIDEO_MODELS.find(m => m.id === modelId);
@@ -108,29 +119,31 @@ export async function generateVideo(prompt, modelId, aspectRatio, key, onStatus)
   return poll(pred.id, key, onStatus);
 }
 
-/**
- * Generate a talking-head video from a portrait photo + script audio.
- * Uses SadTalker on Replicate.
- * @param {string} imageDataUrl  data:image/...;base64,...
- * @param {string} audioDataUrl  data:audio/...;base64,...
- * @param {string} key
- * @param {(status:string, pct:number) => void} onStatus
- * @returns {Promise<string>}  URL of generated video
- */
-export async function generateAvatar(imageDataUrl, audioDataUrl, key, onStatus) {
+export async function generateAvatar(imageDataUrl, audioDataUrl, key, onStatus, modelId = 'sadtalker') {
   if (!key) throw new Error('No Replicate API key — add it in Settings → Video');
   onStatus?.('starting', 2);
-  const pred = await startPrediction('cjwbw/sadtalker', {
-    source_image: imageDataUrl,
-    driven_audio: audioDataUrl,
-    preprocess: 'crop',
-    still_mode: false,
-    use_enhancer: true,
-    size_of_image: 256,
-    pose_style: 0,
-    expression_scale: 1.0,
-  }, key);
-  if (pred.output) return pred.output;
+  let pred;
+  if (modelId === 'wav2lip') {
+    pred = await startPrediction('devxpy/cog-wav2lip', {
+      face: imageDataUrl,
+      audio: audioDataUrl,
+      pads: '0 10 0 0',
+      fps: 25,
+      smooth: true,
+    }, key);
+  } else {
+    pred = await startPrediction('cjwbw/sadtalker', {
+      source_image: imageDataUrl,
+      driven_audio: audioDataUrl,
+      preprocess: 'crop',
+      still_mode: false,
+      use_enhancer: true,
+      size_of_image: 256,
+      pose_style: 0,
+      expression_scale: 1.0,
+    }, key);
+  }
+  if (pred.output) return Array.isArray(pred.output) ? pred.output[0] : pred.output;
   onStatus?.('processing', 10);
   return poll(pred.id, key, onStatus);
 }

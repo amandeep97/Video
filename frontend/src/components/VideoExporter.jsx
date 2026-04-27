@@ -121,13 +121,23 @@ async function generateVideoBlob(script, onProgress, withAudio, videoEls, imageE
   });
 }
 
+const PLATFORMS = [
+  { id: 'youtube',   label: 'YouTube',   emoji: '▶️',  format: 'landscape', desc: '16:9' },
+  { id: 'tiktok',    label: 'TikTok',    emoji: '🎵',  format: 'portrait',  desc: '9:16' },
+  { id: 'reels',     label: 'Reels',     emoji: '📸',  format: 'portrait',  desc: '9:16' },
+  { id: 'instagram', label: 'Post',      emoji: '🟫',  format: 'square',    desc: '1:1'  },
+  { id: 'twitter',   label: 'Twitter/X', emoji: '✖️',  format: 'landscape', desc: '16:9' },
+  { id: 'whatsapp',  label: 'Status',    emoji: '💬',  format: 'portrait',  desc: '9:16' },
+];
+
 export default function VideoExporter({ script, onClose, videoFormat = 'landscape', showCaptions = false, musicStyle = 'none', customMusicUrl = null, voiceLang = 'en-US', animStyle = 'slide', filterStyle = 'none', styleEffect = 'none', motionTracking = false, watermark = '', falVideoUrls = null, customBgUrl = null, customBgType = 'image' }) {
-  const [status,    setStatus]   = useState('idle');
-  const [progress,  setProgress] = useState({ scene: 0, total: 0, pct: 0 });
-  const [videoUrl,  setVideoUrl] = useState('');
-  const [videoMime, setVideoMime]= useState('');
-  const [withAudio, setWithAudio]= useState(true);
-  const [errMsg,    setErrMsg]   = useState('');
+  const [status,       setStatus]      = useState('idle');
+  const [progress,     setProgress]    = useState({ scene: 0, total: 0, pct: 0 });
+  const [videoUrl,     setVideoUrl]    = useState('');
+  const [videoMime,    setVideoMime]   = useState('');
+  const [withAudio,    setWithAudio]   = useState(true);
+  const [errMsg,       setErrMsg]      = useState('');
+  const [exportFormat, setExportFormat]= useState(videoFormat);
   const { apiKey: elKey } = getElevenLabsSettings();
   const pexelsKey  = getPexelsKey();
   const pixabayKey = getPixabayKey();
@@ -186,7 +196,7 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
           setProgress(p => ({ ...p, scene: done, total, pct: (done / total) * 40 }));
         });
       }
-      const { blob, mimeType } = await generateVideoBlob(script, setProgress, withAudio, videoEls, imageEls, { format: videoFormat, captions: showCaptions, musicStyle, customMusicUrl, voiceLang, animStyle, filterStyle, styleEffect, motionTracking, watermark });
+      const { blob, mimeType } = await generateVideoBlob(script, setProgress, withAudio, videoEls, imageEls, { format: exportFormat, captions: showCaptions, musicStyle, customMusicUrl, voiceLang, animStyle, filterStyle, styleEffect, motionTracking, watermark });
       setVideoUrl(URL.createObjectURL(blob));
       setVideoMime(mimeType);
       setStatus('done');
@@ -227,6 +237,25 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
 
         {status === 'idle' && (
           <div className="space-y-4">
+            {/* Platform presets */}
+            <div>
+              <label className="text-xs text-white/50 mb-2 block font-medium">Export For Platform</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {PLATFORMS.map(p => (
+                  <button key={p.id} onClick={() => setExportFormat(p.format)}
+                    className={`flex flex-col items-center gap-1 py-2 px-1 rounded-xl border transition-all ${
+                      exportFormat === p.format && PLATFORMS.find(x => x.id === p.id)?.format === exportFormat
+                        ? 'bg-brand-500/20 border-brand-500/40 text-white'
+                        : 'glass border-white/10 hover:border-white/20 text-white/60'
+                    } ${exportFormat === p.format ? 'bg-brand-500/20 border-brand-500/40 text-white' : ''}`}>
+                    <span className="text-base">{p.emoji}</span>
+                    <span className="text-[10px] font-medium">{p.label}</span>
+                    <span className="text-[9px] text-white/30">{p.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="glass rounded-xl p-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-white/50">Scenes</span>
@@ -235,6 +264,10 @@ export default function VideoExporter({ script, onClose, videoFormat = 'landscap
               <div className="flex justify-between text-sm">
                 <span className="text-white/50">Duration</span>
                 <span className="text-white">{estimatedTime}s (~{Math.ceil(estimatedTime / 60)} min to export)</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-white/50">Format</span>
+                <span className="text-white capitalize">{exportFormat}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-white/50">Background</span>

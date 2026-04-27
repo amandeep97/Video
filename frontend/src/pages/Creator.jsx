@@ -20,6 +20,7 @@ import MusicPicker from '../components/MusicPicker.jsx';
 import VoiceCustomizer from '../components/VoiceCustomizer.jsx';
 import AiVideoGenerator from '../components/AiVideoGenerator.jsx';
 import AiAvatarGenerator from '../components/AiAvatarGenerator.jsx';
+import TemplatesModal from '../components/TemplatesModal.jsx';
 
 // ── Stable components defined OUTSIDE Creator to prevent remount on re-render ──
 
@@ -117,6 +118,7 @@ export default function Creator() {
   const [customBgName,         setCustomBgName]         = useState('');
   const [showAiVideo,          setShowAiVideo]          = useState(false);
   const [showAiAvatar,         setShowAiAvatar]         = useState(false);
+  const [showTemplates,        setShowTemplates]        = useState(false);
 
   // Modal state
   const [showApiKeyModal,    setShowApiKeyModal]    = useState(false);
@@ -716,13 +718,19 @@ export default function Creator() {
         </div>
       )}
 
-      <button onClick={handleGenerate} disabled={isGenerating || !topic.trim()}
-        className="btn-primary w-full flex items-center justify-center gap-3 py-4 text-base">
-        {isGenerating
-          ? <><RefreshCw className="w-5 h-5 animate-spin" /><span>Generating...</span></>
-          : <><Sparkles className="w-5 h-5" /><span>{script ? 'Regenerate' : 'Generate'} Video</span></>
-        }
-      </button>
+      <div className="flex gap-2">
+        <button onClick={handleGenerate} disabled={isGenerating || !topic.trim()}
+          className="btn-primary flex-1 flex items-center justify-center gap-3 py-4 text-base">
+          {isGenerating
+            ? <><RefreshCw className="w-5 h-5 animate-spin" /><span>Generating...</span></>
+            : <><Sparkles className="w-5 h-5" /><span>{script ? 'Regenerate' : 'Generate'} Video</span></>
+          }
+        </button>
+        <button onClick={() => setShowTemplates(true)} disabled={isGenerating}
+          className="btn-secondary flex items-center gap-2 px-4 py-4 text-sm disabled:opacity-40">
+          📋 Templates
+        </button>
+      </div>
 
       {script && (
         <div className="space-y-2">
@@ -1023,6 +1031,12 @@ export default function Creator() {
           voiceLang={voiceLang}
           onVideoReady={handleVideoReady}
           onClose={() => setShowAiAvatar(false)}
+        />
+      )}
+      {showTemplates && (
+        <TemplatesModal
+          onSelect={t => { setTopic(t.topic); setStyle(t.style); setDuration(t.duration); }}
+          onClose={() => setShowTemplates(false)}
         />
       )}
     </div>

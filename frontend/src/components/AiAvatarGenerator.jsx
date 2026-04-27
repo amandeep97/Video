@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { X, User, Loader2, CheckCircle, AlertCircle, Upload, ExternalLink } from 'lucide-react';
-import { generateAvatar, getReplicateKey, blobToDataUrl } from '../services/replicate.js';
+import { generateAvatar, getReplicateKey, blobToDataUrl, AVATAR_MODELS } from '../services/replicate.js';
 import { getAudioBlob } from '../services/tts.js';
 import { VOICE_LANGUAGES } from '../services/tts.js';
 
@@ -11,10 +11,11 @@ const STATUS_LABELS = {
 };
 
 export default function AiAvatarGenerator({ scene, sceneIndex, voiceLang, onVideoReady, onClose }) {
-  const [photoUrl,   setPhotoUrl]   = useState(null); // data URL
+  const [photoUrl,   setPhotoUrl]   = useState(null);
   const [photoName,  setPhotoName]  = useState('');
   const [script,     setScript]     = useState(scene?.narration || '');
   const [lang,       setLang]       = useState(voiceLang || 'en-US');
+  const [avatarModel,setAvatarModel]= useState('sadtalker');
   const [status,     setStatus]     = useState('idle');
   const [statusMsg,  setStatusMsg]  = useState('');
   const [pct,        setPct]        = useState(0);
@@ -41,12 +42,12 @@ export default function AiAvatarGenerator({ scene, sceneIndex, voiceLang, onVide
       if (!audioBlob) throw new Error('Could not generate voice audio. Check your voice settings.');
       const audioDataUrl = await blobToDataUrl(audioBlob);
 
-      // Step 2: send photo + audio to SadTalker
+      // Step 2: send photo + audio to avatar model
       setStatusMsg(STATUS_LABELS.starting); setPct(20);
       const url = await generateAvatar(photoUrl, audioDataUrl, key, (s, p) => {
         setStatusMsg(STATUS_LABELS[s] || s);
         setPct(20 + Math.round(p * 0.78));
-      });
+      }, avatarModel);
       setVideoUrl(url);
       setStatus('done');
       setPct(100);
@@ -136,6 +137,23 @@ export default function AiAvatarGenerator({ scene, sceneIndex, voiceLang, onVide
               disabled={status === 'generating'}
             />
             <p className="text-[10px] text-white/25 mt-1">{script.length} chars · ~{Math.round(script.split(/\s+/).length / 2.5)}s audio</p>
+          </div>
+
+          {/* Avatar model */}
+          <div>
+            <label className="text-sm text-white/50 mb-1.5 block font-medium">Avatar Model</label>
+            <div className="grid grid-cols-2 gap-2">
+              {AVATAR_MODELS.map(m => (
+                <button key={m.id} onClick={() => setAvatarModel(m.id)}
+                  className={`p-2.5 rounded-xl border transition-all text-left ${
+                    avatarModel === m.id ? 'bg-pink-500/20 border-pink-500/50' : 'glass border-white/10 hover:border-white/20'
+                  }`}>
+                  <p className="text-xs font-bold text-white">{m.label}</p>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${m.badgeColor}`}>{m.badge}</span>
+                  <p className="text-[10px] text-white/30 mt-1">{m.desc}</p>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Language */}

@@ -3,10 +3,20 @@ import { X, Play, Loader2, Check, Mic, ExternalLink } from 'lucide-react';
 import {
   VOICE_LANGUAGES,
   getVoiceSettings, saveVoiceSettings,
-  getElevenLabsSettings,
+  getElevenLabsSettings, saveElevenLabsSettings,
   fetchHuggingFaceTTS, fetchCloudTTS, speakBrowser,
   getAllVoices, saveVoiceLang,
 } from '../services/tts.js';
+
+const EL_VOICES = [
+  { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel',  desc: 'Calm · Female · English' },
+  { id: 'AZnzlk1XvdvUeBnXmlld', name: 'Domi',    desc: 'Strong · Female · English' },
+  { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella',   desc: 'Soft · Female · English' },
+  { id: 'ErXwobaYiN019PkySvjV', name: 'Antoni',  desc: 'Warm · Male · English' },
+  { id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh',    desc: 'Deep · Male · English' },
+  { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam',    desc: 'Narration · Male · English' },
+  { id: 'yoZ06aMxZJJ28mfd3POQ', name: 'Sam',     desc: 'News · Male · English' },
+];
 
 const SAMPLE_TEXTS = {
   'hi-IN': 'नमस्ते! यह एक परीक्षण आवाज़ है। मैं आपके वीडियो के लिए बोलूंगा।',
@@ -55,6 +65,7 @@ export default function VoiceCustomizer({ onClose, voiceLang = 'en-US', onLangCh
   const settings   = getVoiceSettings();
   const elSettings = getElevenLabsSettings();
 
+  const [elVoiceId,   setElVoiceId]   = useState(elSettings.voiceId || '21m00Tcm4TlvDq8ikWAM');
   const [provider,    setProvider]    = useState(settings.provider);
   const [rate,        setRate]        = useState(settings.rate);
   const [pitch,       setPitch]       = useState(settings.pitch);
@@ -139,6 +150,7 @@ export default function VoiceCustomizer({ onClose, voiceLang = 'en-US', onLangCh
 
   const handleSave = () => {
     saveVoiceSettings({ provider, rate, pitch, voiceURI, hfToken });
+    saveElevenLabsSettings(undefined, elVoiceId);
     saveVoiceLang(selectedLang);
     onLangChange?.(selectedLang);
     setSaved(true);
@@ -331,9 +343,46 @@ export default function VoiceCustomizer({ onClose, voiceLang = 'en-US', onLangCh
 
         {/* ElevenLabs */}
         {provider === 'elevenlabs' && (
-          <div className="glass rounded-xl p-4 text-center space-y-2">
-            <p className="text-sm text-white/60">Uses your ElevenLabs key from <strong className="text-white">Settings → Voice</strong></p>
-            <p className="text-xs text-white/40">Premium quality · 10,000 chars/month free · Realistic emotion</p>
+          <div className="space-y-3">
+            <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl space-y-1.5">
+              <p className="text-xs text-white/80 font-semibold">🎙️ ElevenLabs Setup</p>
+              <ol className="text-xs text-white/60 space-y-1 list-none">
+                <li>1️⃣ Go to <strong className="text-white">elevenlabs.io</strong> → Sign up free</li>
+                <li>2️⃣ Add your API key in <strong className="text-white">Settings → Voice</strong></li>
+                <li>3️⃣ Pick a voice below (or paste your own cloned voice ID)</li>
+              </ol>
+              <p className="text-[10px] text-purple-300/60">Free: 10,000 chars/month · Realistic emotion · Multilingual</p>
+            </div>
+
+            {/* Preset voices */}
+            <div>
+              <label className="text-xs text-white/50 mb-2 block">Choose Voice</label>
+              <div className="space-y-1.5 max-h-44 overflow-y-auto">
+                {EL_VOICES.map(v => (
+                  <button key={v.id} onClick={() => setElVoiceId(v.id)}
+                    className={`w-full flex items-center justify-between gap-3 p-3 rounded-xl text-left transition-all ${
+                      elVoiceId === v.id ? 'bg-purple-500/15 border border-purple-500/30' : 'glass hover:bg-white/5'
+                    }`}>
+                    <div>
+                      <p className="text-sm font-medium text-white">{v.name}</p>
+                      <p className="text-[10px] text-white/40">{v.desc}</p>
+                    </div>
+                    {elVoiceId === v.id && <Check className="w-4 h-4 text-purple-400 flex-shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom cloned voice ID */}
+            <div>
+              <label className="text-xs text-white/50 mb-1.5 block">Or paste your Cloned Voice ID</label>
+              <input type="text" value={elVoiceId} onChange={e => setElVoiceId(e.target.value)}
+                placeholder="e.g. pNInz6obpgDQGcFmaJgB"
+                className="input-field text-xs font-mono" />
+              <p className="text-[10px] text-white/25 mt-1">
+                ElevenLabs → Voice Lab → Instant Voice Clone → copy the ID
+              </p>
+            </div>
           </div>
         )}
 
