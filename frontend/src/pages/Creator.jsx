@@ -23,6 +23,9 @@ import AiAvatarGenerator from '../components/AiAvatarGenerator.jsx';
 import TemplatesModal from '../components/TemplatesModal.jsx';
 import TopicFinder from '../components/TopicFinder.jsx';
 import QualityChecker from '../components/QualityChecker.jsx';
+import DescriptionWriter from '../components/DescriptionWriter.jsx';
+import ScriptTranslator from '../components/ScriptTranslator.jsx';
+import HookGenerator from '../components/HookGenerator.jsx';
 
 // ── Stable components defined OUTSIDE Creator to prevent remount on re-render ──
 
@@ -123,6 +126,9 @@ export default function Creator() {
   const [showTemplates,        setShowTemplates]        = useState(false);
   const [showTopicFinder,      setShowTopicFinder]      = useState(false);
   const [showQualityChecker,   setShowQualityChecker]   = useState(false);
+  const [showDescriptionWriter,setShowDescriptionWriter]= useState(false);
+  const [showScriptTranslator, setShowScriptTranslator] = useState(false);
+  const [showHookGenerator,    setShowHookGenerator]    = useState(false);
 
   // Modal state
   const [showApiKeyModal,    setShowApiKeyModal]    = useState(false);
@@ -830,10 +836,24 @@ export default function Creator() {
               📸 Thumbnail
             </button>
           </div>
-          {/* Quality Checker */}
-          <button onClick={() => setShowQualityChecker(true)}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-blue-500/30 text-blue-300 hover:bg-blue-500/10 transition-all text-sm font-medium">
-            🛡️ Check Video Quality
+          {/* Agent tools row */}
+          <div className="grid grid-cols-3 gap-2">
+            <button onClick={() => setShowQualityChecker(true)}
+              className="flex flex-col items-center gap-1 py-2 rounded-xl border border-blue-500/30 text-blue-300 hover:bg-blue-500/10 transition-all text-xs font-medium">
+              🛡️ <span>Quality</span>
+            </button>
+            <button onClick={() => setShowHookGenerator(true)}
+              className="flex flex-col items-center gap-1 py-2 rounded-xl border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/10 transition-all text-xs font-medium">
+              ⚡ <span>Hook</span>
+            </button>
+            <button onClick={() => setShowDescriptionWriter(true)}
+              className="flex flex-col items-center gap-1 py-2 rounded-xl border border-orange-500/30 text-orange-300 hover:bg-orange-500/10 transition-all text-xs font-medium">
+              📝 <span>Desc+Tags</span>
+            </button>
+          </div>
+          <button onClick={() => setShowScriptTranslator(true)}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/10 transition-all text-sm font-medium">
+            🌐 Translate Script
           </button>
           {/* AI Generate + AI Avatar buttons */}
           <div className="flex gap-2">
@@ -1060,6 +1080,15 @@ export default function Creator() {
       )}
       {showQualityChecker && script && (
         <QualityChecker script={script} onClose={() => setShowQualityChecker(false)} />
+      )}
+      {showDescriptionWriter && script && (
+        <DescriptionWriter script={script} onClose={() => setShowDescriptionWriter(false)} />
+      )}
+      {showScriptTranslator && script && (
+        <ScriptTranslator script={script} onApply={setScript} onClose={() => setShowScriptTranslator(false)} />
+      )}
+      {showHookGenerator && script && (
+        <HookGenerator script={script} onApply={setScript} onClose={() => setShowHookGenerator(false)} />
       )}
     </div>
   );
