@@ -77,18 +77,18 @@ Return ONLY valid JSON, no markdown:
         </div>
 
         <div className="space-y-4">
-          {/* Hook type preview */}
+          {/* Hook type preview — info only, not clickable */}
           {hooks.length === 0 && (
-            <div className="grid grid-cols-1 gap-2">
-              {HOOK_TYPES.map(h => (
-                <div key={h.id} className="flex items-center gap-3 glass p-3 rounded-xl">
-                  <span className="text-xl">{h.emoji}</span>
-                  <div>
-                    <p className="text-xs font-semibold text-white">{h.label}</p>
-                    <p className="text-[10px] text-white/35">{h.desc}</p>
+            <div className="space-y-2">
+              <p className="text-xs text-white/30 text-center">Click Generate — AI writes one of each style for your topic</p>
+              <div className="grid grid-cols-5 gap-1.5">
+                {HOOK_TYPES.map(h => (
+                  <div key={h.id} className="flex flex-col items-center gap-1 py-2.5 rounded-xl bg-white/5 border border-white/5">
+                    <span className="text-lg">{h.emoji}</span>
+                    <p className="text-[9px] font-medium text-white/50">{h.label}</p>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
 

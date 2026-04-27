@@ -26,6 +26,7 @@ import QualityChecker from '../components/QualityChecker.jsx';
 import DescriptionWriter from '../components/DescriptionWriter.jsx';
 import ScriptTranslator from '../components/ScriptTranslator.jsx';
 import HookGenerator from '../components/HookGenerator.jsx';
+import BulkGenerator from '../components/BulkGenerator.jsx';
 
 // ── Stable components defined OUTSIDE Creator to prevent remount on re-render ──
 
@@ -129,6 +130,7 @@ export default function Creator() {
   const [showDescriptionWriter,setShowDescriptionWriter]= useState(false);
   const [showScriptTranslator, setShowScriptTranslator] = useState(false);
   const [showHookGenerator,    setShowHookGenerator]    = useState(false);
+  const [showBulkGenerator,    setShowBulkGenerator]    = useState(false);
 
   // Modal state
   const [showApiKeyModal,    setShowApiKeyModal]    = useState(false);
@@ -737,12 +739,16 @@ export default function Creator() {
           }
         </button>
         <button onClick={() => setShowTemplates(true)} disabled={isGenerating}
-          className="btn-secondary flex items-center gap-2 px-3 py-4 text-sm disabled:opacity-40">
+          className="btn-secondary flex items-center gap-2 px-3 py-4 text-sm disabled:opacity-40" title="Templates">
           📋
         </button>
         <button onClick={() => setShowTopicFinder(true)} disabled={isGenerating}
-          className="btn-secondary flex items-center gap-2 px-3 py-4 text-sm disabled:opacity-40">
+          className="btn-secondary flex items-center gap-2 px-3 py-4 text-sm disabled:opacity-40" title="Topic Finder">
           🔥
+        </button>
+        <button onClick={() => setShowBulkGenerator(true)} disabled={isGenerating}
+          className="btn-secondary flex items-center gap-2 px-3 py-4 text-sm disabled:opacity-40" title="Bulk Generate">
+          ⚡
         </button>
       </div>
 
@@ -1089,6 +1095,9 @@ export default function Creator() {
       )}
       {showHookGenerator && script && (
         <HookGenerator script={script} onApply={setScript} onClose={() => setShowHookGenerator(false)} />
+      )}
+      {showBulkGenerator && (
+        <BulkGenerator onScriptsReady={setScript} onClose={() => setShowBulkGenerator(false)} />
       )}
     </div>
   );
