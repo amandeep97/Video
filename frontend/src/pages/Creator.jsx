@@ -21,6 +21,8 @@ import VoiceCustomizer from '../components/VoiceCustomizer.jsx';
 import AiVideoGenerator from '../components/AiVideoGenerator.jsx';
 import AiAvatarGenerator from '../components/AiAvatarGenerator.jsx';
 import TemplatesModal from '../components/TemplatesModal.jsx';
+import TopicFinder from '../components/TopicFinder.jsx';
+import QualityChecker from '../components/QualityChecker.jsx';
 
 // ── Stable components defined OUTSIDE Creator to prevent remount on re-render ──
 
@@ -119,6 +121,8 @@ export default function Creator() {
   const [showAiVideo,          setShowAiVideo]          = useState(false);
   const [showAiAvatar,         setShowAiAvatar]         = useState(false);
   const [showTemplates,        setShowTemplates]        = useState(false);
+  const [showTopicFinder,      setShowTopicFinder]      = useState(false);
+  const [showQualityChecker,   setShowQualityChecker]   = useState(false);
 
   // Modal state
   const [showApiKeyModal,    setShowApiKeyModal]    = useState(false);
@@ -727,8 +731,12 @@ export default function Creator() {
           }
         </button>
         <button onClick={() => setShowTemplates(true)} disabled={isGenerating}
-          className="btn-secondary flex items-center gap-2 px-4 py-4 text-sm disabled:opacity-40">
-          📋 Templates
+          className="btn-secondary flex items-center gap-2 px-3 py-4 text-sm disabled:opacity-40">
+          📋
+        </button>
+        <button onClick={() => setShowTopicFinder(true)} disabled={isGenerating}
+          className="btn-secondary flex items-center gap-2 px-3 py-4 text-sm disabled:opacity-40">
+          🔥
         </button>
       </div>
 
@@ -822,6 +830,11 @@ export default function Creator() {
               📸 Thumbnail
             </button>
           </div>
+          {/* Quality Checker */}
+          <button onClick={() => setShowQualityChecker(true)}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-blue-500/30 text-blue-300 hover:bg-blue-500/10 transition-all text-sm font-medium">
+            🛡️ Check Video Quality
+          </button>
           {/* AI Generate + AI Avatar buttons */}
           <div className="flex gap-2">
             <button onClick={() => setShowAiVideo(true)}
@@ -1038,6 +1051,15 @@ export default function Creator() {
           onSelect={t => { setTopic(t.topic); setStyle(t.style); setDuration(t.duration); }}
           onClose={() => setShowTemplates(false)}
         />
+      )}
+      {showTopicFinder && (
+        <TopicFinder
+          onSelect={t => { setTopic(t.topic); setStyle(t.style); setDuration(t.duration); }}
+          onClose={() => setShowTopicFinder(false)}
+        />
+      )}
+      {showQualityChecker && script && (
+        <QualityChecker script={script} onClose={() => setShowQualityChecker(false)} />
       )}
     </div>
   );

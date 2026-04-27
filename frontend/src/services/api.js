@@ -67,7 +67,7 @@ async function callGemini(apiKey, model, system, userMessage, maxTokens) {
 
 // ─── Unified caller ────────────────────────────────────────────────────────
 
-async function callAI(system, userMessage, maxTokens = 4096) {
+export async function callAI(system, userMessage, maxTokens = 4096) {
   const { providerId, modelId, apiKey } = getSettings();
   if (!apiKey) throw new Error('No API key set. Click the ⚙ Settings button to add one.');
   const provider = PROVIDERS[providerId];
