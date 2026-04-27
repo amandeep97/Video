@@ -99,10 +99,26 @@ export const AVATAR_MODELS = [
   {
     id: 'wav2lip',
     label: 'Wav2Lip',
-    badge: 'Best Lip Sync',
+    badge: 'Sharp Sync',
     badgeColor: 'text-orange-400 border-orange-500/30 bg-orange-500/10',
     cost: '~$0.10/video',
     desc: 'Sharper lip sync accuracy',
+  },
+  {
+    id: 'musetalk',
+    label: 'MuseTalk',
+    badge: 'HeyGen-like',
+    badgeColor: 'text-cyan-400 border-cyan-500/30 bg-cyan-500/10',
+    cost: '~$0.15/video',
+    desc: 'Smooth real-time lip sync · Tencent',
+  },
+  {
+    id: 'latentsync',
+    label: 'LatentSync',
+    badge: 'Best Quality',
+    badgeColor: 'text-green-400 border-green-500/30 bg-green-500/10',
+    cost: '~$0.15/video',
+    desc: 'Most realistic lip sync · ByteDance',
   },
 ];
 
@@ -130,6 +146,18 @@ export async function generateAvatar(imageDataUrl, audioDataUrl, key, onStatus, 
       pads: '0 10 0 0',
       fps: 25,
       smooth: true,
+    }, key);
+  } else if (modelId === 'musetalk') {
+    pred = await startPrediction('camenduru/musetalk', {
+      source_image: imageDataUrl,
+      driven_audio: audioDataUrl,
+    }, key);
+  } else if (modelId === 'latentsync') {
+    pred = await startPrediction('bytedance/latentsync', {
+      video: imageDataUrl,
+      audio: audioDataUrl,
+      guidance_scale: 1.5,
+      inference_steps: 20,
     }, key);
   } else {
     pred = await startPrediction('cjwbw/sadtalker', {
