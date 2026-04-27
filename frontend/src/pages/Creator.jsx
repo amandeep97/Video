@@ -170,6 +170,15 @@ export default function Creator() {
     });
   };
 
+  const loadScript = (newScript) => {
+    setScript(newScript);
+    setCurrentScene(0);
+    setFalVideoUrls(null);
+    setCustomBgUrl(null);
+    setCustomBgName('');
+    setFalError('');
+  };
+
   const handleTrackSelect = (track) => {
     setSelectedTrack(track);
     if (track) {
@@ -1091,13 +1100,13 @@ export default function Creator() {
         <DescriptionWriter script={script} onClose={() => setShowDescriptionWriter(false)} />
       )}
       {showScriptTranslator && script && (
-        <ScriptTranslator script={script} onApply={setScript} onClose={() => setShowScriptTranslator(false)} />
+        <ScriptTranslator script={script} onApply={loadScript} onClose={() => setShowScriptTranslator(false)} />
       )}
       {showHookGenerator && script && (
         <HookGenerator script={script} onApply={setScript} onClose={() => setShowHookGenerator(false)} />
       )}
       {showBulkGenerator && (
-        <BulkGenerator onScriptsReady={setScript} onClose={() => setShowBulkGenerator(false)} />
+        <BulkGenerator onScriptsReady={loadScript} onClose={() => setShowBulkGenerator(false)} />
       )}
     </div>
   );
