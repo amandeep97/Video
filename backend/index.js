@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import Anthropic from '@anthropic-ai/sdk';
+import gtts from 'node-gtts';
 
 dotenv.config();
 
@@ -313,42 +314,27 @@ app.get('/api/generate-video/:id', async (req, res) => {
  * Returns: { id, status, output? }
  */
 
-const HF_TTS_MODELS = {
-  'en-US': 'facebook/mms-tts-eng', 'en-GB': 'facebook/mms-tts-eng',
-  'hi-IN': 'facebook/mms-tts-hin', 'pa-IN': 'facebook/mms-tts-pan',
-  'es-ES': 'facebook/mms-tts-spa', 'fr-FR': 'facebook/mms-tts-fra',
-  'de-DE': 'facebook/mms-tts-deu', 'pt-BR': 'facebook/mms-tts-por',
-  'ar-SA': 'facebook/mms-tts-ara', 'ja-JP': 'facebook/mms-tts-jpn',
-  'zh-CN': 'facebook/mms-tts-cmn', 'ko-KR': 'facebook/mms-tts-kor',
+const GTTS_LANG = {
+  'en-US': 'en', 'en-GB': 'en', 'hi-IN': 'hi', 'pa-IN': 'pa',
+  'es-ES': 'es', 'fr-FR': 'fr', 'de-DE': 'de', 'pt-BR': 'pt',
+  'ar-SA': 'ar', 'ja-JP': 'ja', 'zh-CN': 'zh-cn', 'ko-KR': 'ko',
 };
 
-async function fetchTTSAudio(script, lang = 'en-US') {
-  const model = HF_TTS_MODELS[lang] || HF_TTS_MODELS['en-US'];
-  const url = `https://api-inference.huggingface.co/models/${model}`;
-
-  const doFetch = () => fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ inputs: script }),
+function fetchTTSAudio(script, lang = 'en-US') {
+  const langCode = GTTS_LANG[lang] || 'en';
+  const tts = gtts(langCode);
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    const timer = setTimeout(() => reject(new Error('TTS timeout')), 30000);
+    const stream = tts.stream(script);
+    stream.on('data', c => chunks.push(c));
+    stream.on('end', () => {
+      clearTimeout(timer);
+      const b64 = Buffer.concat(chunks).toString('base64');
+      resolve(`data:audio/mpeg;base64,${b64}`);
+    });
+    stream.on('error', e => { clearTimeout(timer); reject(new Error(`TTS failed: ${e.message}`)); });
   });
-
-  let res = await doFetch();
-
-  // HuggingFace returns 503 while model loads — wait and retry once
-  if (res.status === 503) {
-    await new Promise(r => setTimeout(r, 20000));
-    res = await doFetch();
-  }
-
-  if (!res.ok) throw new Error(`TTS error ${res.status}`);
-  const ct = res.headers.get('content-type') || '';
-  if (ct.includes('json')) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error || 'TTS model loading');
-  }
-  const buf = await res.arrayBuffer();
-  const b64 = Buffer.from(buf).toString('base64');
-  return `data:audio/flac;base64,${b64}`;
 }
 
 app.post('/api/generate-avatar', async (req, res) => {
