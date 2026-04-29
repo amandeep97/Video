@@ -313,21 +313,42 @@ app.get('/api/generate-video/:id', async (req, res) => {
  * Returns: { id, status, output? }
  */
 
-const SE_VOICES = {
-  'hi-IN': 'Aditi', 'pa-IN': 'Aditi', 'en-US': 'Joanna', 'en-GB': 'Amy',
-  'es-ES': 'Conchita', 'fr-FR': 'Celine', 'de-DE': 'Marlene',
-  'ja-JP': 'Mizuki', 'zh-CN': 'Zhiyu', 'ko-KR': 'Seoyeon',
-  'pt-BR': 'Vitoria', 'ar-SA': 'Zeynep',
+const HF_TTS_MODELS = {
+  'en-US': 'facebook/mms-tts-eng', 'en-GB': 'facebook/mms-tts-eng',
+  'hi-IN': 'facebook/mms-tts-hin', 'pa-IN': 'facebook/mms-tts-pan',
+  'es-ES': 'facebook/mms-tts-spa', 'fr-FR': 'facebook/mms-tts-fra',
+  'de-DE': 'facebook/mms-tts-deu', 'pt-BR': 'facebook/mms-tts-por',
+  'ar-SA': 'facebook/mms-tts-ara', 'ja-JP': 'facebook/mms-tts-jpn',
+  'zh-CN': 'facebook/mms-tts-cmn', 'ko-KR': 'facebook/mms-tts-kor',
 };
 
 async function fetchTTSAudio(script, lang = 'en-US') {
-  const voice = SE_VOICES[lang] || 'Joanna';
-  const url = `https://api.streamelements.com/kappa/v2/speech?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(script)}`;
-  const res = await fetch(url);
+  const model = HF_TTS_MODELS[lang] || HF_TTS_MODELS['en-US'];
+  const url = `https://api-inference.huggingface.co/models/${model}`;
+
+  const doFetch = () => fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ inputs: script }),
+  });
+
+  let res = await doFetch();
+
+  // HuggingFace returns 503 while model loads — wait and retry once
+  if (res.status === 503) {
+    await new Promise(r => setTimeout(r, 20000));
+    res = await doFetch();
+  }
+
   if (!res.ok) throw new Error(`TTS error ${res.status}`);
+  const ct = res.headers.get('content-type') || '';
+  if (ct.includes('json')) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error || 'TTS model loading');
+  }
   const buf = await res.arrayBuffer();
   const b64 = Buffer.from(buf).toString('base64');
-  return `data:audio/mpeg;base64,${b64}`;
+  return `data:audio/flac;base64,${b64}`;
 }
 
 app.post('/api/generate-avatar', async (req, res) => {
