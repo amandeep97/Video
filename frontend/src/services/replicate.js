@@ -3,7 +3,12 @@ const BASE = 'https://api.replicate.com/v1';
 export function getReplicateKey() { return localStorage.getItem('replicate_key') || ''; }
 export function saveReplicateKey(k) { localStorage.setItem('replicate_key', k.trim()); }
 export function getBackendUrl() { return localStorage.getItem('backend_url') || ''; }
-export function saveBackendUrl(u) { localStorage.setItem('backend_url', u.trim().replace(/\/$/, '')); }
+export function saveBackendUrl(u) {
+  let url = u.trim().replace(/\/$/, '');
+  if (url && !url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
+  if (url.startsWith('http://')) url = 'https://' + url.slice(7);
+  localStorage.setItem('backend_url', url);
+}
 
 // ── Available models ──────────────────────────────────────────────────────────
 export const VIDEO_MODELS = [
