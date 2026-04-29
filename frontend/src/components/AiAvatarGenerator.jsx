@@ -37,19 +37,26 @@ export default function AiAvatarGenerator({ scene, sceneIndex, voiceLang, onVide
     if (!photoUrl || !script.trim()) return;
     setStatus('generating'); setErrMsg(''); setVideoUrl(''); setPct(0);
     try {
-      // Step 1: generate TTS audio — try configured provider, fall back to cloud TTS
-      setStatusMsg(STATUS_LABELS.tts); setPct(10);
-      let audioBlob = await getAudioBlob(script.trim(), lang).catch(() => null);
-      if (!audioBlob) audioBlob = await fetchCloudTTS(script.trim(), lang).catch(() => null);
-      if (!audioBlob) throw new Error('Could not generate voice audio. Please set a voice provider in Voice Settings.');
-      const audioDataUrl = await blobToDataUrl(audioBlob);
+      let audioDataUrl = null;
 
-      // Step 2: send photo + audio to avatar model
+      if (backendUrl) {
+        // Backend generates TTS server-side — avoids iOS Safari network blocks
+        setStatusMsg(STATUS_LABELS.starting); setPct(10);
+      } else {
+        // No backend — generate TTS client-side
+        setStatusMsg(STATUS_LABELS.tts); setPct(10);
+        let audioBlob = await getAudioBlob(script.trim(), lang).catch(() => null);
+        if (!audioBlob) audioBlob = await fetchCloudTTS(script.trim(), lang).catch(() => null);
+        if (!audioBlob) throw new Error('Could not generate voice audio. Please set a voice provider in Voice Settings.');
+        audioDataUrl = await blobToDataUrl(audioBlob);
+      }
+
+      // Step 2: send photo + audio (or script) to avatar model
       setStatusMsg(STATUS_LABELS.starting); setPct(20);
       const url = await generateAvatar(photoUrl, audioDataUrl, key, (s, p) => {
         setStatusMsg(STATUS_LABELS[s] || s);
         setPct(20 + Math.round(p * 0.78));
-      }, avatarModel);
+      }, avatarModel, script.trim(), lang);
       setVideoUrl(url);
       setStatus('done');
       setPct(100);

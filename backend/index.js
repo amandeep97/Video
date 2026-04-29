@@ -286,16 +286,39 @@ app.get('/api/generate-video/:id', async (req, res) => {
 
 /**
  * POST /api/generate-avatar
- * Body: { imageDataUrl, audioDataUrl }
- * Uses SadTalker to animate a portrait photo with audio.
+ * Body: { imageDataUrl, audioDataUrl?, script?, lang?, modelId? }
+ * If audioDataUrl is missing, generates TTS from script+lang server-side.
  * Returns: { id, status, output? }
  */
+
+const SE_VOICES = {
+  'hi-IN': 'Aditi', 'pa-IN': 'Aditi', 'en-US': 'Joanna', 'en-GB': 'Amy',
+  'es-ES': 'Conchita', 'fr-FR': 'Celine', 'de-DE': 'Marlene',
+  'ja-JP': 'Mizuki', 'zh-CN': 'Zhiyu', 'ko-KR': 'Seoyeon',
+  'pt-BR': 'Vitoria', 'ar-SA': 'Zeynep',
+};
+
+async function fetchTTSAudio(script, lang = 'en-US') {
+  const voice = SE_VOICES[lang] || 'Joanna';
+  const url = `https://api.streamelements.com/kappa/v2/speech?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(script)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`TTS error ${res.status}`);
+  const buf = await res.arrayBuffer();
+  const b64 = Buffer.from(buf).toString('base64');
+  return `data:audio/mpeg;base64,${b64}`;
+}
+
 app.post('/api/generate-avatar', async (req, res) => {
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) return res.status(500).json({ error: 'REPLICATE_API_TOKEN not set in .env' });
 
-  const { imageDataUrl, audioDataUrl, modelId = 'sadtalker' } = req.body;
-  if (!imageDataUrl || !audioDataUrl) return res.status(400).json({ error: 'imageDataUrl and audioDataUrl are required' });
+  let { imageDataUrl, audioDataUrl, script, lang, modelId = 'sadtalker' } = req.body;
+  if (!imageDataUrl) return res.status(400).json({ error: 'imageDataUrl is required' });
+  if (!audioDataUrl) {
+    if (!script) return res.status(400).json({ error: 'audioDataUrl or script is required' });
+    try { audioDataUrl = await fetchTTSAudio(script, lang); }
+    catch (e) { return res.status(500).json({ error: `TTS failed: ${e.message}` }); }
+  }
 
   const AVATAR_MODELS = {
     sadtalker: () => startPrediction('cjwbw', 'sadtalker', {

@@ -158,12 +158,16 @@ async function generateVideoViaBackend(prompt, modelId, aspectRatio, backendUrl,
   return pollBackend(data.id, backendUrl, onStatus);
 }
 
-async function generateAvatarViaBackend(imageDataUrl, audioDataUrl, backendUrl, onStatus, modelId = 'sadtalker') {
+async function generateAvatarViaBackend(imageDataUrl, audioDataUrl, backendUrl, onStatus, modelId = 'sadtalker', script, lang) {
   onStatus?.('starting', 5);
+  // Send script+lang so backend does TTS (avoids iOS Safari network restrictions)
+  const body = audioDataUrl
+    ? { imageDataUrl, audioDataUrl, modelId }
+    : { imageDataUrl, script, lang, modelId };
   const res = await fetch(`${backendUrl}/api/generate-avatar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imageDataUrl, audioDataUrl, modelId }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Backend ${res.status}`); }
   const data = await res.json();
@@ -184,9 +188,9 @@ async function pollBackend(id, backendUrl, onStatus) {
   throw new Error('Timeout');
 }
 
-export async function generateAvatar(imageDataUrl, audioDataUrl, key, onStatus, modelId = 'sadtalker') {
+export async function generateAvatar(imageDataUrl, audioDataUrl, key, onStatus, modelId = 'sadtalker', script, lang) {
   const backendUrl = getBackendUrl();
-  if (backendUrl) return generateAvatarViaBackend(imageDataUrl, audioDataUrl, backendUrl, onStatus, modelId);
+  if (backendUrl) return generateAvatarViaBackend(imageDataUrl, audioDataUrl, backendUrl, onStatus, modelId, script, lang);
   if (!key) throw new Error('No Replicate API key — add it in Settings → Video');
   onStatus?.('starting', 2);
   let pred;
