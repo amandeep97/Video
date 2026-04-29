@@ -12,14 +12,65 @@ export function saveBackendUrl(u) {
 
 // ── Available models ──────────────────────────────────────────────────────────
 export const VIDEO_MODELS = [
+  // ── High Quality (CapCut-level) ───────────────────────────────────────────
+  {
+    id: 'seedance',
+    label: 'Seedance 2.0',
+    badge: '⚡ CapCut Model',
+    badgeColor: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10',
+    replicateId: 'bytedance/seedance-2.0',
+    cost: '~$0.50/clip',
+    tier: 'premium',
+    desc: 'Exact model CapCut uses. Best quality available.',
+    input: (prompt, ar) => ({
+      prompt,
+      aspect_ratio: ar,
+      duration: -1,
+    }),
+  },
+  {
+    id: 'hunyuan',
+    label: 'HunyuanVideo',
+    badge: '🔥 Cinema Quality',
+    badgeColor: 'text-orange-400 border-orange-500/30 bg-orange-500/10',
+    replicateId: 'tencent/hunyuan-video',
+    cost: '~$0.40/clip',
+    tier: 'premium',
+    desc: 'Tencent 13B model. Cinematic, smooth motion.',
+    input: (prompt, ar) => ({
+      prompt,
+      width:  ar === '9:16' ? 544 : ar === '1:1' ? 544 : 960,
+      height: ar === '9:16' ? 960 : ar === '1:1' ? 544 : 544,
+      num_frames: 129,
+      flow_shift: 7,
+      num_inference_steps: 50,
+    }),
+  },
+  // ── Good Quality (Better than old models) ────────────────────────────────
+  {
+    id: 'wan27',
+    label: 'Wan 2.7',
+    badge: 'High Quality',
+    badgeColor: 'text-purple-400 border-purple-500/30 bg-purple-500/10',
+    replicateId: 'wan-video/wan-2.7-t2v',
+    cost: '~$0.20/clip',
+    tier: 'good',
+    desc: 'Latest Wan model. Big upgrade from Wan 2.2.',
+    input: (prompt, ar) => ({
+      prompt,
+      resolution: ar === '9:16' ? '480p' : '720p',
+    }),
+  },
+  // ── Basic (Old models, cheap) ─────────────────────────────────────────────
   {
     id: 'wan22',
-    label: 'Wan2.2',
-    badge: 'Best Quality',
-    badgeColor: 'text-purple-400 border-purple-500/30 bg-purple-500/10',
-    // Replicate: update version hash from https://replicate.com/wavymulder/wan2.2
+    label: 'Wan 2.2',
+    badge: 'Basic',
+    badgeColor: 'text-white/40 border-white/20 bg-white/5',
     replicateId: 'wavymulder/wan2.2',
     cost: '~$0.15/clip',
+    tier: 'basic',
+    desc: 'Older model. Cartoon-like quality.',
     input: (prompt, ar) => ({
       prompt,
       num_frames: 81,
@@ -36,6 +87,8 @@ export const VIDEO_MODELS = [
     badgeColor: 'text-blue-400 border-blue-500/30 bg-blue-500/10',
     replicateId: 'lightricks/ltx-video',
     cost: '~$0.05/clip',
+    tier: 'basic',
+    desc: 'Fastest and cheapest. Low quality.',
     input: (prompt, ar) => ({
       prompt,
       num_frames: 49,
@@ -47,10 +100,12 @@ export const VIDEO_MODELS = [
   {
     id: 'mochi',
     label: 'Mochi 1',
-    badge: 'Low VRAM',
+    badge: 'Cheap',
     badgeColor: 'text-green-400 border-green-500/30 bg-green-500/10',
     replicateId: 'genmo/mochi-1',
     cost: '~$0.08/clip',
+    tier: 'basic',
+    desc: 'Decent motion, basic quality.',
     input: (prompt) => ({ prompt, num_frames: 84, fps: 30 }),
   },
 ];

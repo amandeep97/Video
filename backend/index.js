@@ -263,12 +263,26 @@ app.post('/api/generate-video', async (req, res) => {
   if (!prompt) return res.status(400).json({ error: 'prompt is required' });
 
   const MODELS = {
-    wan22: { owner: 'wavymulder', name: 'wan2.2',
+    // ── Premium (CapCut-level quality) ────────────────────────────────────
+    seedance: { owner: 'bytedance', name: 'seedance-2.0',
+      input: () => ({ prompt, aspect_ratio: aspectRatio, duration: -1 }) },
+    hunyuan:  { owner: 'tencent', name: 'hunyuan-video',
+      input: () => ({
+        prompt,
+        width:  aspectRatio === '9:16' ? 544 : aspectRatio === '1:1' ? 544 : 960,
+        height: aspectRatio === '9:16' ? 960 : aspectRatio === '1:1' ? 544 : 544,
+        num_frames: 129, flow_shift: 7, num_inference_steps: 50,
+      }) },
+    // ── Good quality ──────────────────────────────────────────────────────
+    wan27:  { owner: 'wan-video', name: 'wan-2.7-t2v',
+      input: () => ({ prompt, resolution: aspectRatio === '9:16' ? '480p' : '720p' }) },
+    // ── Basic (old models) ────────────────────────────────────────────────
+    wan22:  { owner: 'wavymulder', name: 'wan2.2',
       input: () => ({ prompt, num_frames: 81, fps: 16, aspect_ratio: aspectRatio, guidance_scale: 5.0, num_inference_steps: 30 }) },
-    ltx:   { owner: 'lightricks', name: 'ltx-video',
+    ltx:    { owner: 'lightricks', name: 'ltx-video',
       input: () => ({ prompt, num_frames: 49, frame_rate: 24,
         width: aspectRatio === '9:16' ? 480 : 704, height: aspectRatio === '9:16' ? 704 : 480 }) },
-    mochi: { owner: 'genmo', name: 'mochi-1',
+    mochi:  { owner: 'genmo', name: 'mochi-1',
       input: () => ({ prompt, num_frames: 84, fps: 30 }) },
   };
 
