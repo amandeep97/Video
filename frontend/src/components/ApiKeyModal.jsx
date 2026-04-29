@@ -8,7 +8,7 @@ import { getJamendoKey, saveJamendoKey } from '../services/jamendo.js';
 import { getFreesoundKey, saveFreesoundKey } from '../services/freesound.js';
 import { getFalKey, saveFalKey } from '../services/fal.js';
 import { getDidKey, saveDidKey } from '../services/did.js';
-import { getReplicateKey, saveReplicateKey } from '../services/replicate.js';
+import { getReplicateKey, saveReplicateKey, getBackendUrl, saveBackendUrl } from '../services/replicate.js';
 
 export default function ApiKeyModal({ onClose }) {
   const current    = getSettings();
@@ -37,6 +37,7 @@ export default function ApiKeyModal({ onClose }) {
   const [showDid,         setShowDid]         = useState(false);
   const [replicateKey,    setReplicateKey]    = useState(getReplicateKey());
   const [showReplicate,   setShowReplicate]   = useState(false);
+  const [backendUrl,      setBackendUrl]      = useState(getBackendUrl());
 
   const provider = PROVIDERS[selectedProvider];
 
@@ -57,6 +58,7 @@ export default function ApiKeyModal({ onClose }) {
     saveFalKey(falKey);
     saveDidKey(didKey);
     saveReplicateKey(replicateKey);
+    saveBackendUrl(backendUrl);
     setSaved(true);
     setTimeout(() => { setSaved(false); onClose(); }, 700);
   };
@@ -259,6 +261,24 @@ export default function ApiKeyModal({ onClose }) {
                   </button>
                 </div>
               </div>
+            </div>
+
+            <div className="border-t border-white/10" />
+
+            {/* Backend URL — Railway deployment */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-base">🚀</span>
+                <div>
+                  <p className="text-sm font-semibold text-white">Backend URL <span className="text-xs text-green-400 font-normal">— Railway / Render</span></p>
+                  <p className="text-xs text-white/40">Paste your deployed backend URL to fix AI video on iPhone/mobile</p>
+                </div>
+                {backendUrl && <span className="ml-auto w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />}
+              </div>
+              <input type="text" value={backendUrl} onChange={e => setBackendUrl(e.target.value)}
+                placeholder="https://your-app.railway.app"
+                className="input-field font-mono text-sm" />
+              <p className="text-[10px] text-white/30">Leave empty to call Replicate directly (may fail on mobile)</p>
             </div>
 
             <div className="border-t border-white/10" />

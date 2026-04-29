@@ -2,6 +2,8 @@ const BASE = 'https://api.replicate.com/v1';
 
 export function getReplicateKey() { return localStorage.getItem('replicate_key') || ''; }
 export function saveReplicateKey(k) { localStorage.setItem('replicate_key', k.trim()); }
+export function getBackendUrl() { return localStorage.getItem('backend_url') || ''; }
+export function saveBackendUrl(u) { localStorage.setItem('backend_url', u.trim().replace(/\/$/, '')); }
 
 // ── Available models ──────────────────────────────────────────────────────────
 export const VIDEO_MODELS = [
@@ -125,6 +127,8 @@ export const AVATAR_MODELS = [
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export async function generateVideo(prompt, modelId, aspectRatio, key, onStatus) {
+  const backendUrl = getBackendUrl();
+  if (backendUrl) return generateVideoViaBackend(prompt, modelId, aspectRatio, backendUrl, onStatus);
   if (!key) throw new Error('No Replicate API key — add it in Settings → Video');
   const model = VIDEO_MODELS.find(m => m.id === modelId);
   if (!model) throw new Error('Unknown model');
@@ -135,7 +139,49 @@ export async function generateVideo(prompt, modelId, aspectRatio, key, onStatus)
   return poll(pred.id, key, onStatus);
 }
 
+async function generateVideoViaBackend(prompt, modelId, aspectRatio, backendUrl, onStatus) {
+  onStatus?.('starting', 5);
+  const res = await fetch(`${backendUrl}/api/generate-video`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt, model: modelId, aspectRatio }),
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Backend ${res.status}`); }
+  const data = await res.json();
+  if (data.output) return data.output;
+  onStatus?.('processing', 15);
+  return pollBackend(data.id, backendUrl, onStatus);
+}
+
+async function generateAvatarViaBackend(imageDataUrl, audioDataUrl, backendUrl, onStatus) {
+  onStatus?.('starting', 5);
+  const res = await fetch(`${backendUrl}/api/generate-avatar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ imageDataUrl, audioDataUrl }),
+  });
+  if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Backend ${res.status}`); }
+  const data = await res.json();
+  if (data.output) return Array.isArray(data.output) ? data.output[0] : data.output;
+  onStatus?.('processing', 15);
+  return pollBackend(data.id, backendUrl, onStatus);
+}
+
+async function pollBackend(id, backendUrl, onStatus) {
+  for (let i = 0; i < 100; i++) {
+    await new Promise(r => setTimeout(r, 4000));
+    const res = await fetch(`${backendUrl}/api/generate-video/${id}`);
+    const data = await res.json();
+    onStatus?.(data.status, Math.min(95, 15 + Math.round((i / 45) * 80)));
+    if (data.status === 'succeeded') return data.output;
+    if (data.status === 'failed' || data.status === 'canceled') throw new Error(data.error || 'Generation failed');
+  }
+  throw new Error('Timeout');
+}
+
 export async function generateAvatar(imageDataUrl, audioDataUrl, key, onStatus, modelId = 'sadtalker') {
+  const backendUrl = getBackendUrl();
+  if (backendUrl) return generateAvatarViaBackend(imageDataUrl, audioDataUrl, backendUrl, onStatus);
   if (!key) throw new Error('No Replicate API key — add it in Settings → Video');
   onStatus?.('starting', 2);
   let pred;
