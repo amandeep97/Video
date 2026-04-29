@@ -27,6 +27,7 @@ import DescriptionWriter from '../components/DescriptionWriter.jsx';
 import ScriptTranslator from '../components/ScriptTranslator.jsx';
 import HookGenerator from '../components/HookGenerator.jsx';
 import BulkGenerator from '../components/BulkGenerator.jsx';
+import BatchVideoGenerator from '../components/BatchVideoGenerator.jsx';
 
 // ── Stable components defined OUTSIDE Creator to prevent remount on re-render ──
 
@@ -124,6 +125,7 @@ export default function Creator() {
   const [customBgName,         setCustomBgName]         = useState('');
   const [showAiVideo,          setShowAiVideo]          = useState(false);
   const [showAiAvatar,         setShowAiAvatar]         = useState(false);
+  const [showBatchVideo,       setShowBatchVideo]       = useState(false);
   const [showTemplates,        setShowTemplates]        = useState(false);
   const [showTopicFinder,      setShowTopicFinder]      = useState(false);
   const [showQualityChecker,   setShowQualityChecker]   = useState(false);
@@ -881,6 +883,10 @@ export default function Creator() {
               👤 AI Avatar
             </button>
           </div>
+          <button onClick={() => setShowBatchVideo(true)}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-blue-500/30 text-blue-300 hover:bg-blue-500/10 transition-all text-sm font-medium">
+            <Sparkles className="w-4 h-4" /> Generate All Scenes at Once
+          </button>
         </div>
       )}
     </div>
@@ -1079,6 +1085,14 @@ export default function Creator() {
           voiceLang={voiceLang}
           onVideoReady={handleVideoReady}
           onClose={() => setShowAiAvatar(false)}
+        />
+      )}
+      {showBatchVideo && script && (
+        <BatchVideoGenerator
+          script={script}
+          videoFormat={videoFormat}
+          onVideoReady={handleVideoReady}
+          onClose={() => setShowBatchVideo(false)}
         />
       )}
       {showTemplates && (
