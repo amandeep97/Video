@@ -191,6 +191,41 @@ async function replicateGet(path, token) {
   return res.json();
 }
 
+// Create a prediction using latest model version — works even when
+// POST /models/{owner}/{name}/predictions returns 404 (no deployment).
+async function startPrediction(owner, name, input, token) {
+  // Try the model-latest endpoint first
+  const r1 = await fetch(`${REPLICATE_BASE}/models/${owner}/${name}/predictions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': 'wait=10' },
+    body: JSON.stringify({ input }),
+  });
+  if (r1.ok) return r1.json();
+
+  // Fall back: look up the latest version hash and use /predictions
+  const modelRes = await fetch(`${REPLICATE_BASE}/models/${owner}/${name}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!modelRes.ok) {
+    const err = await r1.json().catch(() => ({}));
+    throw new Error(err.detail || `Model ${owner}/${name} not found on Replicate`);
+  }
+  const modelData = await modelRes.json();
+  const version = modelData?.latest_version?.id;
+  if (!version) throw new Error(`No published version found for ${owner}/${name}`);
+
+  const r2 = await fetch(`${REPLICATE_BASE}/predictions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': 'wait=10' },
+    body: JSON.stringify({ version, input }),
+  });
+  if (!r2.ok) {
+    const err = await r2.json().catch(() => ({}));
+    throw new Error(err.detail || `Replicate ${r2.status}`);
+  }
+  return r2.json();
+}
+
 /**
  * POST /api/generate-video
  * Body: { prompt, model, aspectRatio }
@@ -216,11 +251,7 @@ app.post('/api/generate-video', async (req, res) => {
 
   const m = MODELS[model] || MODELS.ltx;
   try {
-    const prediction = await replicatePost(
-      `/models/${m.owner}/${m.name}/predictions`,
-      { input: m.input() }, token,
-    );
-    // If already done (Prefer: wait=10 returned result)
+    const prediction = await startPrediction(m.owner, m.name, m.input(), token);
     if (prediction.output) {
       const url = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
       return res.json({ id: prediction.id, status: 'succeeded', output: url });
@@ -267,17 +298,15 @@ app.post('/api/generate-avatar', async (req, res) => {
   if (!imageDataUrl || !audioDataUrl) return res.status(400).json({ error: 'imageDataUrl and audioDataUrl are required' });
 
   try {
-    const prediction = await replicatePost('/models/cjwbw/sadtalker/predictions', {
-      input: {
-        source_image: imageDataUrl,
-        driven_audio: audioDataUrl,
-        preprocess: 'crop',
-        still_mode: false,
-        use_enhancer: true,
-        size_of_image: 256,
-        pose_style: 0,
-        expression_scale: 1.0,
-      },
+    const prediction = await startPrediction('cjwbw', 'sadtalker', {
+      source_image: imageDataUrl,
+      driven_audio: audioDataUrl,
+      preprocess: 'crop',
+      still_mode: false,
+      use_enhancer: true,
+      size_of_image: 256,
+      pose_style: 0,
+      expression_scale: 1.0,
     }, token);
 
     if (prediction.output) return res.json({ id: prediction.id, status: 'succeeded', output: prediction.output });
