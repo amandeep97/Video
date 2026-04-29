@@ -191,10 +191,43 @@ async function replicateGet(path, token) {
   return res.json();
 }
 
-// Create a prediction using latest model version — works even when
-// POST /models/{owner}/{name}/predictions returns 404 (no deployment).
+// Cache model version hashes so we only look them up once per server restart.
+// This prevents wasting rate-limited API calls on repeated model lookups.
+const versionCache = new Map();
+
+async function getModelVersion(owner, name, token) {
+  const key = `${owner}/${name}`;
+  if (versionCache.has(key)) return versionCache.get(key);
+  const res = await fetch(`${REPLICATE_BASE}/models/${owner}/${name}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Model ${key} not found on Replicate`);
+  const data = await res.json();
+  const version = data?.latest_version?.id;
+  if (!version) throw new Error(`No published version for ${key}`);
+  versionCache.set(key, version);
+  return version;
+}
+
+// Create a prediction. Uses cached version hash when available (1 API call),
+// falls back to version lookup on first use (2 API calls), avoids 3-call pattern
+// that was exhausting the burst rate limit on low-credit accounts.
 async function startPrediction(owner, name, input, token) {
-  // Try the model-latest endpoint first
+  const key = `${owner}/${name}`;
+
+  // If we already know the version, go straight to /predictions (1 API call)
+  if (versionCache.has(key)) {
+    const version = versionCache.get(key);
+    const res = await fetch(`${REPLICATE_BASE}/predictions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': 'wait=10' },
+      body: JSON.stringify({ version, input }),
+    });
+    if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.detail || `Replicate ${res.status}`); }
+    return res.json();
+  }
+
+  // First time: try model-latest endpoint (1 call). If it works, great.
   const r1 = await fetch(`${REPLICATE_BASE}/models/${owner}/${name}/predictions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': 'wait=10' },
@@ -202,27 +235,16 @@ async function startPrediction(owner, name, input, token) {
   });
   if (r1.ok) return r1.json();
 
-  // Fall back: look up the latest version hash and use /predictions
-  const modelRes = await fetch(`${REPLICATE_BASE}/models/${owner}/${name}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!modelRes.ok) {
-    const err = await r1.json().catch(() => ({}));
-    throw new Error(err.detail || `Model ${owner}/${name} not found on Replicate`);
-  }
-  const modelData = await modelRes.json();
-  const version = modelData?.latest_version?.id;
-  if (!version) throw new Error(`No published version found for ${owner}/${name}`);
+  // Model endpoint returned 404 — look up version hash and cache it (2nd call)
+  const version = await getModelVersion(owner, name, token);
 
+  // Create prediction with version hash (3rd call — only happens once per model)
   const r2 = await fetch(`${REPLICATE_BASE}/predictions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': 'wait=10' },
     body: JSON.stringify({ version, input }),
   });
-  if (!r2.ok) {
-    const err = await r2.json().catch(() => ({}));
-    throw new Error(err.detail || `Replicate ${r2.status}`);
-  }
+  if (!r2.ok) { const err = await r2.json().catch(() => ({})); throw new Error(err.detail || `Replicate ${r2.status}`); }
   return r2.json();
 }
 
