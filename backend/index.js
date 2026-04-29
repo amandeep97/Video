@@ -394,6 +394,109 @@ app.get('/api/generate-avatar/:id', async (req, res) => {
   }
 });
 
+// ── fal.ai proxy routes ───────────────────────────────────────────────────────
+// These proxy fal.ai requests through the backend so mobile (iOS Safari) can
+// use Kling/Flux without CORS issues. Requires FAL_API_KEY in .env.
+
+const FAL_BASE  = 'https://fal.run';
+const FAL_QUEUE = 'https://queue.fal.run';
+
+async function falPost(modelId, input, token) {
+  const res = await fetch(`${FAL_BASE}/${modelId}`, {
+    method: 'POST',
+    headers: { Authorization: `Key ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail || err?.error || err?.message || `FAL ${res.status}`);
+  }
+  return res.json();
+}
+
+async function falPoll(modelId, requestId, token) {
+  const url = `${FAL_QUEUE}/${modelId}/requests/${requestId}`;
+  for (let i = 0; i < 80; i++) {
+    await new Promise(r => setTimeout(r, 3000));
+    const res = await fetch(url, { headers: { Authorization: `Key ${token}` } });
+    const data = await res.json();
+    if (data.video?.url) return { videoUrl: data.video.url };
+    if (data.images?.[0]?.url) return { imageUrl: data.images[0].url };
+    if (data.status === 'COMPLETED' && data.output) {
+      const out = data.output;
+      if (out?.video?.url) return { videoUrl: out.video.url };
+      if (out?.images?.[0]?.url) return { imageUrl: out.images[0].url };
+    }
+    if (data.status === 'FAILED') throw new Error(data.error || 'FAL generation failed');
+  }
+  throw new Error('Timeout — fal.ai took too long');
+}
+
+async function runFalJob(modelId, input, token) {
+  const data = await falPost(modelId, input, token);
+  if (data.video?.url) return { videoUrl: data.video.url };
+  if (data.images?.[0]?.url) return { imageUrl: data.images[0].url };
+  const requestId = data.request_id;
+  if (!requestId) throw new Error('No request_id from fal.ai');
+  return falPoll(modelId, requestId, token);
+}
+
+/**
+ * POST /api/fal/generate-video
+ * Body: { prompt, falModelId, duration?, aspect_ratio? }
+ */
+app.post('/api/fal/generate-video', async (req, res) => {
+  const token = process.env.FAL_API_KEY;
+  if (!token) return res.status(500).json({ error: 'FAL_API_KEY not set in .env' });
+  const { prompt, falModelId, duration = '5', aspect_ratio = '16:9' } = req.body;
+  if (!prompt) return res.status(400).json({ error: 'prompt is required' });
+  try {
+    const result = await runFalJob(falModelId, { prompt, duration, aspect_ratio }, token);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /api/fal/generate-image
+ * Body: { prompt, falModelId, width?, height? }
+ */
+app.post('/api/fal/generate-image', async (req, res) => {
+  const token = process.env.FAL_API_KEY;
+  if (!token) return res.status(500).json({ error: 'FAL_API_KEY not set in .env' });
+  const { prompt, falModelId, width = 1024, height = 1024 } = req.body;
+  if (!prompt) return res.status(400).json({ error: 'prompt is required' });
+  try {
+    const result = await runFalJob(falModelId, {
+      prompt,
+      image_size: { width, height },
+      num_inference_steps: 28,
+      guidance_scale: 3.5,
+    }, token);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /api/fal/image-to-video
+ * Body: { prompt, image_url, falModelId, duration?, aspect_ratio? }
+ */
+app.post('/api/fal/image-to-video', async (req, res) => {
+  const token = process.env.FAL_API_KEY;
+  if (!token) return res.status(500).json({ error: 'FAL_API_KEY not set in .env' });
+  const { prompt, image_url, falModelId, duration = '5', aspect_ratio = '9:16' } = req.body;
+  if (!prompt || !image_url) return res.status(400).json({ error: 'prompt and image_url required' });
+  try {
+    const result = await runFalJob(falModelId, { prompt, image_url, duration, aspect_ratio }, token);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

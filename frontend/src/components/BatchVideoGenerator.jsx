@@ -1,18 +1,33 @@
 import { useState, useRef } from 'react';
-import { X, Sparkles, Loader2, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
+import { X, Sparkles, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { generateFalVideo, FAL_VIDEO_MODELS, getFalKey, getFalBackendUrl } from '../services/fal.js';
 import { generateVideo, VIDEO_MODELS, getReplicateKey, getBackendUrl } from '../services/replicate.js';
 
+// Unified model list for batch: fal.ai first
+const BATCH_MODELS = [
+  ...FAL_VIDEO_MODELS.map(m => ({ ...m, provider: 'fal' })),
+  ...VIDEO_MODELS.map(m => ({ ...m, provider: 'replicate' })),
+];
+
 export default function BatchVideoGenerator({ script, videoFormat, onVideoReady, onClose }) {
-  const [modelId,   setModelId]   = useState('ltx');
-  const [status,    setStatus]    = useState('idle');  // idle | running | done
-  const [results,   setResults]   = useState([]);       // per-scene: {status, url, error}
-  const [current,   setCurrent]   = useState(-1);
+  const [modelId,  setModelId]  = useState('kling-v2');
+  const [status,   setStatus]   = useState('idle');
+  const [results,  setResults]  = useState([]);
+  const [current,  setCurrent]  = useState(-1);
   const abortRef = useRef(false);
 
-  const key = getReplicateKey();
-  const backendUrl = getBackendUrl();
-  const canRun = !!(key || backendUrl);
-  const ar  = videoFormat === 'portrait' ? '9:16' : videoFormat === 'square' ? '1:1' : '16:9';
+  const falKey       = getFalKey();
+  const falBackend   = getFalBackendUrl();
+  const replicateKey = getReplicateKey();
+  const replicateBE  = getBackendUrl();
+
+  const hasFal       = !!(falKey || falBackend);
+  const hasReplicate = !!(replicateKey || replicateBE);
+
+  const selectedModel = BATCH_MODELS.find(m => m.id === modelId) || BATCH_MODELS[0];
+  const canRun = selectedModel.provider === 'fal' ? hasFal : hasReplicate;
+
+  const ar     = videoFormat === 'portrait' ? '9:16' : videoFormat === 'square' ? '1:1' : '16:9';
   const scenes = script?.scenes || [];
 
   const handleStart = async () => {
@@ -28,14 +43,18 @@ export default function BatchVideoGenerator({ script, videoFormat, onVideoReady,
 
       const prompt = scenes[i].visualDescription || scenes[i].title || `Scene ${i + 1}`;
       try {
-        const url = await generateVideo(prompt, modelId, ar, key, () => {});
+        let url;
+        if (selectedModel.provider === 'fal') {
+          url = await generateFalVideo(prompt, modelId, ar, falKey, () => {});
+        } else {
+          url = await generateVideo(prompt, modelId, ar, replicateKey, () => {});
+        }
         setResults(prev => prev.map((r, idx) => idx === i ? { status: 'done', url, error: null } : r));
         onVideoReady(i, url);
       } catch (e) {
         setResults(prev => prev.map((r, idx) => idx === i ? { status: 'error', url: null, error: e.message } : r));
       }
 
-      // Small delay between scenes to respect Replicate rate limits
       if (i < scenes.length - 1 && !abortRef.current) {
         await new Promise(r => setTimeout(r, 2000));
       }
@@ -45,12 +64,18 @@ export default function BatchVideoGenerator({ script, videoFormat, onVideoReady,
     setStatus('done');
   };
 
-  const handleStop = () => {
-    abortRef.current = true;
-  };
+  const handleStop = () => { abortRef.current = true; };
 
   const doneCount  = results.filter(r => r.status === 'done').length;
   const errorCount = results.filter(r => r.status === 'error').length;
+
+  const totalCost = () => {
+    const cost = parseFloat((selectedModel.cost || '$0.05').replace(/[^0-9.]/g, ''));
+    return (scenes.length * cost).toFixed(2);
+  };
+
+  const falModels = BATCH_MODELS.filter(m => m.provider === 'fal');
+  const repModels = BATCH_MODELS.filter(m => m.provider === 'replicate');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm overflow-y-auto">
@@ -74,7 +99,11 @@ export default function BatchVideoGenerator({ script, videoFormat, onVideoReady,
 
         {!canRun && (
           <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
-            <p className="text-xs text-yellow-300">Add your Replicate API key or Backend URL in Settings → Video first.</p>
+            <p className="text-xs text-yellow-300">
+              {selectedModel.provider === 'fal'
+                ? 'Add your FAL.ai API key in Settings → Video for high-quality Kling videos.'
+                : 'Add your Replicate API key or Backend URL in Settings → Video.'}
+            </p>
           </div>
         )}
 
@@ -83,20 +112,43 @@ export default function BatchVideoGenerator({ script, videoFormat, onVideoReady,
           {status === 'idle' && (
             <div>
               <label className="text-sm text-white/50 mb-1.5 block font-medium">Model for all scenes</label>
-              <div className="grid grid-cols-3 gap-2">
-                {VIDEO_MODELS.map(m => (
-                  <button key={m.id} onClick={() => setModelId(m.id)}
-                    className={`p-2.5 rounded-xl border transition-all text-left ${
-                      modelId === m.id ? 'bg-brand-500/20 border-brand-500/50' : 'glass border-white/10 hover:border-white/20'
-                    }`}>
-                    <p className="text-xs font-bold text-white">{m.label}</p>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${m.badgeColor}`}>{m.badge}</span>
-                    <p className="text-[10px] text-white/30 mt-1">{m.cost}</p>
-                  </button>
-                ))}
+
+              <div className="mb-2">
+                <p className="text-[10px] text-yellow-400 font-bold uppercase tracking-wider mb-1.5">fal.ai — High Quality</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {falModels.map(m => (
+                    <button key={m.id} onClick={() => setModelId(m.id)}
+                      disabled={!hasFal}
+                      className={`p-2.5 rounded-xl border transition-all text-left disabled:opacity-40 ${
+                        modelId === m.id ? 'bg-yellow-500/15 border-yellow-500/40' : 'glass border-white/10 hover:border-white/20'
+                      }`}>
+                      <p className="text-xs font-bold text-white">{m.label}</p>
+                      <span className={`text-[9px] px-1 py-0.5 rounded-full border ${m.badgeColor}`}>{m.badge}</span>
+                      <p className="text-[10px] text-white/30 mt-0.5">{m.cost}</p>
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              <div>
+                <p className="text-[10px] text-white/40 font-bold uppercase tracking-wider mb-1.5">Replicate — Basic</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {repModels.map(m => (
+                    <button key={m.id} onClick={() => setModelId(m.id)}
+                      disabled={!hasReplicate}
+                      className={`p-2.5 rounded-xl border transition-all text-left disabled:opacity-40 ${
+                        modelId === m.id ? 'bg-brand-500/20 border-brand-500/50' : 'glass border-white/10 hover:border-white/20'
+                      }`}>
+                      <p className="text-xs font-bold text-white">{m.label}</p>
+                      <span className={`text-[9px] px-1 py-0.5 rounded-full border ${m.badgeColor}`}>{m.badge}</span>
+                      <p className="text-[10px] text-white/30 mt-0.5">{m.cost}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <p className="text-[10px] text-white/30 mt-2 text-center">
-                Estimated cost: {scenes.length} × {VIDEO_MODELS.find(m => m.id === modelId)?.cost?.replace('~', '') || '?'} = ~${(scenes.length * parseFloat((VIDEO_MODELS.find(m => m.id === modelId)?.cost || '$0').replace(/[^0-9.]/g, ''))).toFixed(2)}
+                Estimated total cost: {scenes.length} × {selectedModel.cost} = ~${totalCost()}
               </p>
             </div>
           )}
@@ -108,9 +160,9 @@ export default function BatchVideoGenerator({ script, videoFormat, onVideoReady,
                 const r = results[i] || {};
                 return (
                   <div key={i} className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${
-                    r.status === 'done'      ? 'bg-green-500/10 border-green-500/20' :
-                    r.status === 'error'     ? 'bg-red-500/10 border-red-500/20' :
-                    r.status === 'generating'? 'bg-purple-500/10 border-purple-500/30' :
+                    r.status === 'done'       ? 'bg-green-500/10 border-green-500/20' :
+                    r.status === 'error'      ? 'bg-red-500/10 border-red-500/20' :
+                    r.status === 'generating' ? 'bg-purple-500/10 border-purple-500/30' :
                     'bg-white/3 border-white/8'
                   }`}>
                     <div className="w-6 h-6 flex-shrink-0 flex items-center justify-center">
@@ -160,7 +212,7 @@ export default function BatchVideoGenerator({ script, videoFormat, onVideoReady,
           {status === 'idle' && (
             <button onClick={handleStart} disabled={!canRun || scenes.length === 0}
               className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-40">
-              <Sparkles className="w-4 h-4" /> Generate All {scenes.length} Scenes
+              <Sparkles className="w-4 h-4" /> Generate All {scenes.length} Scenes (~${totalCost()})
             </button>
           )}
           {status === 'running' && (

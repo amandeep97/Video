@@ -28,6 +28,7 @@ import ScriptTranslator from '../components/ScriptTranslator.jsx';
 import HookGenerator from '../components/HookGenerator.jsx';
 import BulkGenerator from '../components/BulkGenerator.jsx';
 import BatchVideoGenerator from '../components/BatchVideoGenerator.jsx';
+import CartoonCreator from '../components/CartoonCreator.jsx';
 
 // ── Stable components defined OUTSIDE Creator to prevent remount on re-render ──
 
@@ -126,6 +127,7 @@ export default function Creator() {
   const [showAiVideo,          setShowAiVideo]          = useState(false);
   const [showAiAvatar,         setShowAiAvatar]         = useState(false);
   const [showBatchVideo,       setShowBatchVideo]       = useState(false);
+  const [showCartoonCreator,   setShowCartoonCreator]   = useState(false);
   const [showTemplates,        setShowTemplates]        = useState(false);
   const [showTopicFinder,      setShowTopicFinder]      = useState(false);
   const [showQualityChecker,   setShowQualityChecker]   = useState(false);
@@ -872,6 +874,12 @@ export default function Creator() {
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/10 transition-all text-sm font-medium">
             🌐 Translate Script
           </button>
+          {/* Cartoon Creator — the viral TikTok feature */}
+          <button onClick={() => setShowCartoonCreator(true)}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-yellow-500/40 bg-yellow-500/10 text-yellow-300 hover:bg-yellow-500/20 transition-all text-sm font-semibold">
+            🎪 Create Talking Character (Kling AI)
+          </button>
+
           {/* AI Generate + AI Avatar buttons */}
           <div className="flex gap-2">
             <button onClick={() => setShowAiVideo(true)}
@@ -1093,6 +1101,15 @@ export default function Creator() {
           videoFormat={videoFormat}
           onVideoReady={handleVideoReady}
           onClose={() => setShowBatchVideo(false)}
+        />
+      )}
+      {showCartoonCreator && script && (
+        <CartoonCreator
+          scene={script.scenes[currentScene]}
+          sceneIndex={currentScene}
+          videoFormat={videoFormat}
+          onVideoReady={handleVideoReady}
+          onClose={() => setShowCartoonCreator(false)}
         />
       )}
       {showTemplates && (
