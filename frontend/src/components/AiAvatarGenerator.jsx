@@ -1,8 +1,7 @@
 import { useState, useRef } from 'react';
 import { X, User, Loader2, CheckCircle, AlertCircle, Upload, ExternalLink } from 'lucide-react';
-import { generateAvatar, getReplicateKey, blobToDataUrl, AVATAR_MODELS } from '../services/replicate.js';
-import { getAudioBlob } from '../services/tts.js';
-import { VOICE_LANGUAGES } from '../services/tts.js';
+import { generateAvatar, getReplicateKey, getBackendUrl, blobToDataUrl, AVATAR_MODELS } from '../services/replicate.js';
+import { getAudioBlob, fetchCloudTTS, VOICE_LANGUAGES } from '../services/tts.js';
 
 const STATUS_LABELS = {
   starting:   'Starting GPU…',
@@ -24,6 +23,8 @@ export default function AiAvatarGenerator({ scene, sceneIndex, voiceLang, onVide
   const fileRef = useRef();
 
   const key = getReplicateKey();
+  const backendUrl = getBackendUrl();
+  const canGenerate = !!(key || backendUrl);
 
   const handlePhoto = (file) => {
     if (!file || !file.type.startsWith('image/')) return;
@@ -36,10 +37,11 @@ export default function AiAvatarGenerator({ scene, sceneIndex, voiceLang, onVide
     if (!photoUrl || !script.trim()) return;
     setStatus('generating'); setErrMsg(''); setVideoUrl(''); setPct(0);
     try {
-      // Step 1: generate TTS audio
+      // Step 1: generate TTS audio — try configured provider, fall back to cloud TTS
       setStatusMsg(STATUS_LABELS.tts); setPct(10);
-      const audioBlob = await getAudioBlob(script.trim(), lang);
-      if (!audioBlob) throw new Error('Could not generate voice audio. Check your voice settings.');
+      let audioBlob = await getAudioBlob(script.trim(), lang).catch(() => null);
+      if (!audioBlob) audioBlob = await fetchCloudTTS(script.trim(), lang).catch(() => null);
+      if (!audioBlob) throw new Error('Could not generate voice audio. Please set a voice provider in Voice Settings.');
       const audioDataUrl = await blobToDataUrl(audioBlob);
 
       // Step 2: send photo + audio to avatar model
@@ -76,7 +78,7 @@ export default function AiAvatarGenerator({ scene, sceneIndex, voiceLang, onVide
           </button>
         </div>
 
-        {!key && (
+        {!canGenerate && (
           <div className="mb-4 flex gap-3 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
             <AlertCircle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
             <div className="text-xs text-yellow-300">
@@ -215,7 +217,7 @@ export default function AiAvatarGenerator({ scene, sceneIndex, voiceLang, onVide
           {/* Action button */}
           {status !== 'done' && (
             <button onClick={handleGenerate}
-              disabled={!photoUrl || !script.trim() || !key || status === 'generating'}
+              disabled={!photoUrl || !script.trim() || !canGenerate || status === 'generating'}
               className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-gradient-to-r from-pink-600 to-orange-500 text-white text-sm font-semibold hover:from-pink-500 hover:to-orange-400 transition-all disabled:opacity-40">
               {status === 'generating'
                 ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</>

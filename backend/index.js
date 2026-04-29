@@ -294,22 +294,33 @@ app.post('/api/generate-avatar', async (req, res) => {
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) return res.status(500).json({ error: 'REPLICATE_API_TOKEN not set in .env' });
 
-  const { imageDataUrl, audioDataUrl } = req.body;
+  const { imageDataUrl, audioDataUrl, modelId = 'sadtalker' } = req.body;
   if (!imageDataUrl || !audioDataUrl) return res.status(400).json({ error: 'imageDataUrl and audioDataUrl are required' });
 
-  try {
-    const prediction = await startPrediction('cjwbw', 'sadtalker', {
-      source_image: imageDataUrl,
-      driven_audio: audioDataUrl,
-      preprocess: 'crop',
-      still_mode: false,
-      use_enhancer: true,
-      size_of_image: 256,
-      pose_style: 0,
-      expression_scale: 1.0,
-    }, token);
+  const AVATAR_MODELS = {
+    sadtalker: () => startPrediction('cjwbw', 'sadtalker', {
+      source_image: imageDataUrl, driven_audio: audioDataUrl,
+      preprocess: 'crop', still_mode: false, use_enhancer: true,
+      size_of_image: 256, pose_style: 0, expression_scale: 1.0,
+    }, token),
+    wav2lip: () => startPrediction('devxpy', 'cog-wav2lip', {
+      face: imageDataUrl, audio: audioDataUrl, pads: '0 10 0 0', fps: 25, smooth: true,
+    }, token),
+    musetalk: () => startPrediction('camenduru', 'musetalk', {
+      source_image: imageDataUrl, driven_audio: audioDataUrl,
+    }, token),
+    latentsync: () => startPrediction('bytedance', 'latentsync', {
+      video: imageDataUrl, audio: audioDataUrl, guidance_scale: 1.5, inference_steps: 20,
+    }, token),
+  };
 
-    if (prediction.output) return res.json({ id: prediction.id, status: 'succeeded', output: prediction.output });
+  const run = AVATAR_MODELS[modelId] || AVATAR_MODELS.sadtalker;
+  try {
+    const prediction = await run();
+    if (prediction.output) {
+      const out = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
+      return res.json({ id: prediction.id, status: 'succeeded', output: out });
+    }
     res.json({ id: prediction.id, status: prediction.status });
   } catch (e) {
     res.status(500).json({ error: e.message });

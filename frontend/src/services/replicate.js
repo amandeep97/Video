@@ -158,12 +158,12 @@ async function generateVideoViaBackend(prompt, modelId, aspectRatio, backendUrl,
   return pollBackend(data.id, backendUrl, onStatus);
 }
 
-async function generateAvatarViaBackend(imageDataUrl, audioDataUrl, backendUrl, onStatus) {
+async function generateAvatarViaBackend(imageDataUrl, audioDataUrl, backendUrl, onStatus, modelId = 'sadtalker') {
   onStatus?.('starting', 5);
   const res = await fetch(`${backendUrl}/api/generate-avatar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imageDataUrl, audioDataUrl }),
+    body: JSON.stringify({ imageDataUrl, audioDataUrl, modelId }),
   });
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || `Backend ${res.status}`); }
   const data = await res.json();
@@ -186,7 +186,7 @@ async function pollBackend(id, backendUrl, onStatus) {
 
 export async function generateAvatar(imageDataUrl, audioDataUrl, key, onStatus, modelId = 'sadtalker') {
   const backendUrl = getBackendUrl();
-  if (backendUrl) return generateAvatarViaBackend(imageDataUrl, audioDataUrl, backendUrl, onStatus);
+  if (backendUrl) return generateAvatarViaBackend(imageDataUrl, audioDataUrl, backendUrl, onStatus, modelId);
   if (!key) throw new Error('No Replicate API key — add it in Settings → Video');
   onStatus?.('starting', 2);
   let pred;
