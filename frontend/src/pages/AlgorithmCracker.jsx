@@ -5,7 +5,7 @@ import {
   Copy, Check, RefreshCw, Loader2, AlertTriangle, ChevronDown, ChevronUp,
   Target, Flame, Eye, BarChart2
 } from 'lucide-react';
-import { getSettings, PROVIDERS } from '../services/providers.js';
+import { callAI } from '../services/api.js';
 import { getBackendUrl } from '../services/replicate.js';
 
 const PLATFORMS = [
@@ -88,21 +88,57 @@ function CopyAllBtn({ items, label = 'Copy All' }) {
   );
 }
 
-async function callApi(endpoint, body) {
-  const backendUrl = getBackendUrl();
-  const settings   = getSettings();
-  const base = backendUrl || 'http://localhost:3001';
+const VIRAL_SYSTEM = `You are an expert social media algorithm analyst and viral content strategist with deep knowledge of:
+- TikTok FYP algorithm (watch time, completion rate, shares, rewatches)
+- Instagram Reels algorithm (Explore page, saves, DM sends, non-follower reach)
+- YouTube algorithm (CTR, watch time, session time, subscriber conversion)
+- What makes content go viral vs get buried in each platform
+Always respond with valid JSON only, no markdown, no extra text.`;
 
-  const res = await fetch(`${base}${endpoint}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...body, apiKey: settings.apiKey }),
-  });
-  if (!res.ok) {
-    const e = await res.json().catch(() => ({}));
-    throw new Error(e.error || `Server error ${res.status}`);
+async function callViralAI(prompt) {
+  const backendUrl = getBackendUrl();
+
+  // Try backend first (has server-side API key)
+  if (backendUrl) {
+    const res = await fetch(`${backendUrl}/api/viral/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(prompt),
+    });
+    if (res.ok) {
+      const d = await res.json();
+      return d;
+    }
   }
-  return res.json();
+
+  // Fall back to direct AI call using user's stored API key
+  const content = await callAI(VIRAL_SYSTEM, prompt.userPrompt, 2048);
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('AI returned invalid format. Try again.');
+  return { success: true, analysis: JSON.parse(jsonMatch[0]) };
+}
+
+async function callViralEndpoint(endpoint, body) {
+  const backendUrl = getBackendUrl();
+
+  if (backendUrl) {
+    const res = await fetch(`${backendUrl}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) return res.json();
+  }
+
+  // Direct AI fallback
+  const prompt = endpoint.includes('hooks')
+    ? `Generate 10 viral opening hooks for this topic on ${body.platform || 'TikTok'}:\nTopic: "${body.topic}"\n\nEach hook must stop the scroll in the first 2 seconds. Mix different styles.\nRespond with ONLY JSON: { "hooks": [{ "type": "<style>", "text": "<hook text>" }] }`
+    : `Generate 10 viral video titles for this topic optimized for ${body.platform || 'YouTube'} algorithm:\nTopic: "${body.topic}"\n\nTitles must maximize CTR. Use proven formulas: curiosity gaps, numbers, power words.\nRespond with ONLY JSON: { "titles": [{ "type": "<formula used>", "text": "<title>" }] }`;
+
+  const content = await callAI(VIRAL_SYSTEM, prompt, 1024);
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error('AI returned invalid format.');
+  return JSON.parse(jsonMatch[0]);
 }
 
 export default function AlgorithmCracker() {
@@ -123,6 +159,49 @@ export default function AlgorithmCracker() {
   const [extraHooks,  setExtraHooks]  = useState([]);
   const [extraTitles, setExtraTitles] = useState([]);
 
+  const buildAnalyzePrompt = () => `Analyze this video topic for viral potential across social media platforms:
+
+Topic: "${topic.trim()}"
+Target Platform: ${platform}
+Niche: ${niche}
+
+Respond with ONLY this JSON structure:
+{
+  "viralScore": <0-100 integer>,
+  "verdict": "<HIGH POTENTIAL|MEDIUM POTENTIAL|LOW POTENTIAL>",
+  "viralReason": "<2-3 sentence explanation>",
+  "platforms": {
+    "tiktok":    { "score": <0-100>, "tips": ["<tip1>","<tip2>","<tip3>"], "bestTime": "<time>", "bestDays": ["<day1>","<day2>"] },
+    "instagram": { "score": <0-100>, "tips": ["<tip1>","<tip2>","<tip3>"], "bestTime": "<time>", "bestDays": ["<day1>","<day2>"] },
+    "youtube":   { "score": <0-100>, "tips": ["<tip1>","<tip2>","<tip3>"], "bestTime": "<time>", "bestDays": ["<day1>","<day2>"] }
+  },
+  "hooks": [
+    { "type": "Curiosity",  "text": "<scroll-stopping opener>" },
+    { "type": "Shock",      "text": "<shocking opener>" },
+    { "type": "Question",   "text": "<question opener>" },
+    { "type": "Story",      "text": "<story opener>" },
+    { "type": "Challenge",  "text": "<challenge opener>" }
+  ],
+  "titles": [
+    { "type": "Curiosity",   "text": "<title>" },
+    { "type": "How-To",      "text": "<title>" },
+    { "type": "List",        "text": "<title>" },
+    { "type": "Story",       "text": "<title>" },
+    { "type": "Controversy", "text": "<title>" }
+  ],
+  "hashtags": {
+    "tiktok":    ["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8"],
+    "instagram": ["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8","#tag9","#tag10"],
+    "youtube":   ["#tag1","#tag2","#tag3","#tag4","#tag5"]
+  },
+  "contentAngles": ["<angle 1>","<angle 2>","<angle 3>","<angle 4>","<angle 5>"],
+  "warnings": ["<warning if any>"],
+  "thumbnailText": { "headline": "<short punchy headline>", "subtext": "<supporting text>" },
+  "postingSchedule": "<e.g. 3x per week>",
+  "retentionTip": "<single most important retention tip>",
+  "competitorInsight": "<what top creators do differently>"
+}`;
+
   const handleAnalyze = async () => {
     if (!topic.trim()) return;
     setLoading(true);
@@ -132,7 +211,7 @@ export default function AlgorithmCracker() {
     setExtraTitles([]);
     setActiveTab('overview');
     try {
-      const data = await callApi('/api/viral/analyze', { topic: topic.trim(), platform, niche });
+      const data = await callViralAI({ topic: topic.trim(), platform, niche, userPrompt: buildAnalyzePrompt() });
       setAnalysis(data.analysis);
     } catch (e) {
       setError(e.message);
@@ -144,7 +223,7 @@ export default function AlgorithmCracker() {
   const loadMoreHooks = async () => {
     setLoadingMore('hooks');
     try {
-      const data = await callApi('/api/viral/hooks', { topic: topic.trim(), platform, count: 10 });
+      const data = await callViralEndpoint('/api/viral/hooks', { topic: topic.trim(), platform, count: 10 });
       setExtraHooks(data.hooks || []);
     } catch {}
     setLoadingMore('');
@@ -153,7 +232,7 @@ export default function AlgorithmCracker() {
   const loadMoreTitles = async () => {
     setLoadingMore('titles');
     try {
-      const data = await callApi('/api/viral/titles', { topic: topic.trim(), platform, count: 10 });
+      const data = await callViralEndpoint('/api/viral/titles', { topic: topic.trim(), platform, count: 10 });
       setExtraTitles(data.titles || []);
     } catch {}
     setLoadingMore('');
