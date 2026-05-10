@@ -98,20 +98,24 @@ Always respond with valid JSON only, no markdown, no extra text.`;
 async function callViralAI(prompt) {
   const backendUrl = getBackendUrl();
 
-  // Try backend first (has server-side API key)
+  // Try backend first — but catch ALL errors so mobile never gets stuck
   if (backendUrl) {
-    const res = await fetch(`${backendUrl}/api/viral/analyze`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(prompt),
-    });
-    if (res.ok) {
-      const d = await res.json();
-      return d;
+    try {
+      const res = await fetch(`${backendUrl}/api/viral/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(prompt),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        if (d.analysis) return d;
+      }
+    } catch {
+      // Network error, CORS, 404, etc. — fall through to direct AI call
     }
   }
 
-  // Fall back to direct AI call using user's stored API key
+  // Direct AI call using user's stored API key (works on mobile, no backend needed)
   const content = await callAI(VIRAL_SYSTEM, prompt.userPrompt, 2048);
   const jsonMatch = content.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error('AI returned invalid format. Try again.');
@@ -122,12 +126,16 @@ async function callViralEndpoint(endpoint, body) {
   const backendUrl = getBackendUrl();
 
   if (backendUrl) {
-    const res = await fetch(`${backendUrl}${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) return res.json();
+    try {
+      const res = await fetch(`${backendUrl}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) return res.json();
+    } catch {
+      // fall through
+    }
   }
 
   // Direct AI fallback
