@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Video, Sparkles, Zap, Globe, Mic, Layers, ChevronRight, Play, Key } from 'lucide-react';
+import { Video, Sparkles, Zap, Globe, Mic, Layers, ChevronRight, Play, Key, TrendingUp } from 'lucide-react';
 import ApiKeyModal from '../components/ApiKeyModal.jsx';
 import { hasValidKey, getSettings, PROVIDERS } from '../services/providers.js';
 
@@ -60,6 +60,11 @@ export default function Home() {
             <span className="text-xl font-bold gradient-text">VideoAI</span>
           </div>
           <div className="flex items-center gap-3">
+            <button onClick={() => navigate('/viral')}
+              className="flex items-center gap-1.5 py-2 px-4 rounded-xl border border-green-500/40 bg-green-500/10 text-green-300 hover:bg-green-500/20 transition-all text-sm font-medium">
+              <TrendingUp className="w-4 h-4" />
+              <span className="hidden sm:inline">Algorithm Cracker</span>
+            </button>
             <button
               onClick={() => setShowApiKeyModal(true)}
               className="btn-secondary py-2 px-4 text-sm flex items-center gap-2"

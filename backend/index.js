@@ -408,6 +408,203 @@ app.get('/api/generate-avatar/:id', async (req, res) => {
   }
 });
 
+// ── Viral / Algorithm Cracker routes ─────────────────────────────────────────
+
+const VIRAL_SYSTEM = `You are an expert social media algorithm analyst and viral content strategist with deep knowledge of:
+- TikTok FYP algorithm (watch time, completion rate, shares, rewatches)
+- Instagram Reels algorithm (Explore page, saves, DM sends, non-follower reach)
+- YouTube algorithm (CTR, watch time, session time, subscriber conversion)
+- What makes content go viral vs get buried in each platform
+Always respond with valid JSON only, no markdown, no extra text.`;
+
+/**
+ * POST /api/viral/analyze
+ * Full viral potential analysis for a topic across platforms.
+ */
+app.post('/api/viral/analyze', async (req, res) => {
+  const { topic, platform = 'all', niche = 'general' } = req.body;
+  if (!topic) return res.status(400).json({ error: 'topic is required' });
+
+  const prompt = `Analyze this video topic for viral potential across social media platforms:
+
+Topic: "${topic}"
+Target Platform: ${platform}
+Niche: ${niche}
+
+Respond with ONLY this JSON structure:
+{
+  "viralScore": <0-100 integer>,
+  "verdict": "<HIGH POTENTIAL|MEDIUM POTENTIAL|LOW POTENTIAL>",
+  "viralReason": "<2-3 sentence explanation of why this topic has this viral potential>",
+  "platforms": {
+    "tiktok": {
+      "score": <0-100>,
+      "tips": ["<specific actionable tip 1>", "<tip 2>", "<tip 3>"],
+      "bestTime": "<e.g. 7-9pm>",
+      "bestDays": ["<day1>", "<day2>"]
+    },
+    "instagram": {
+      "score": <0-100>,
+      "tips": ["<tip 1>", "<tip 2>", "<tip 3>"],
+      "bestTime": "<time>",
+      "bestDays": ["<day1>", "<day2>"]
+    },
+    "youtube": {
+      "score": <0-100>,
+      "tips": ["<tip 1>", "<tip 2>", "<tip 3>"],
+      "bestTime": "<time>",
+      "bestDays": ["<day1>", "<day2>"]
+    }
+  },
+  "hooks": [
+    { "type": "Curiosity", "text": "<scroll-stopping opening line>" },
+    { "type": "Shock", "text": "<shocking stat or fact opener>" },
+    { "type": "Question", "text": "<question that makes viewer stop>" },
+    { "type": "Story", "text": "<personal story opener>" },
+    { "type": "Challenge", "text": "<challenge or dare opener>" }
+  ],
+  "titles": [
+    { "type": "Curiosity", "text": "<title>" },
+    { "type": "How-To", "text": "<title>" },
+    { "type": "List", "text": "<title>" },
+    { "type": "Story", "text": "<title>" },
+    { "type": "Controversy", "text": "<title>" }
+  ],
+  "hashtags": {
+    "tiktok": ["<#tag1>", "<#tag2>", "<#tag3>", "<#tag4>", "<#tag5>", "<#tag6>", "<#tag7>", "<#tag8>"],
+    "instagram": ["<#tag1>", "<#tag2>", "<#tag3>", "<#tag4>", "<#tag5>", "<#tag6>", "<#tag7>", "<#tag8>", "<#tag9>", "<#tag10>"],
+    "youtube": ["<#tag1>", "<#tag2>", "<#tag3>", "<#tag4>", "<#tag5>"]
+  },
+  "contentAngles": [
+    "<Unique angle 1 with brief description>",
+    "<Unique angle 2>",
+    "<Unique angle 3>",
+    "<Unique angle 4>",
+    "<Unique angle 5>"
+  ],
+  "warnings": ["<warning about oversaturation, controversy risk, etc. if any>"],
+  "thumbnailText": {
+    "headline": "<short punchy thumbnail headline>",
+    "subtext": "<supporting thumbnail text>"
+  },
+  "postingSchedule": "<optimal posting frequency e.g. 3x per week>",
+  "retentionTip": "<single most important tip to keep viewers watching>",
+  "competitorInsight": "<what top creators in this niche do differently to get more reach>"
+}`;
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2048,
+      system: VIRAL_SYSTEM,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const content = message.content[0].text.trim();
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const data = JSON.parse(jsonMatch ? jsonMatch[0] : content);
+    res.json({ success: true, analysis: data });
+  } catch (error) {
+    console.error('Viral analysis error:', error);
+    res.status(500).json({ error: error.message || 'Analysis failed' });
+  }
+});
+
+/**
+ * POST /api/viral/hooks
+ * Generate more hook variations for a topic.
+ */
+app.post('/api/viral/hooks', async (req, res) => {
+  const { topic, platform = 'tiktok', count = 10 } = req.body;
+  if (!topic) return res.status(400).json({ error: 'topic is required' });
+
+  const prompt = `Generate ${count} viral opening hooks for this topic on ${platform}:
+Topic: "${topic}"
+
+Each hook must stop the scroll in the first 2 seconds. Mix different styles.
+Respond with ONLY JSON: { "hooks": [{ "type": "<style>", "text": "<hook text>" }] }`;
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system: VIRAL_SYSTEM,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const content = message.content[0].text.trim();
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const data = JSON.parse(jsonMatch ? jsonMatch[0] : content);
+    res.json({ success: true, ...data });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/viral/titles
+ * Generate viral title variations.
+ */
+app.post('/api/viral/titles', async (req, res) => {
+  const { topic, platform = 'youtube', count = 10 } = req.body;
+  if (!topic) return res.status(400).json({ error: 'topic is required' });
+
+  const prompt = `Generate ${count} viral video titles for this topic optimized for ${platform} algorithm:
+Topic: "${topic}"
+
+Titles must maximize CTR (click-through rate). Use proven formulas: curiosity gaps, numbers, power words.
+Respond with ONLY JSON: { "titles": [{ "type": "<formula used>", "text": "<title>" }] }`;
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system: VIRAL_SYSTEM,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const content = message.content[0].text.trim();
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const data = JSON.parse(jsonMatch ? jsonMatch[0] : content);
+    res.json({ success: true, ...data });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/viral/competitor
+ * Analyze what works in a niche.
+ */
+app.post('/api/viral/competitor', async (req, res) => {
+  const { niche, platform = 'all' } = req.body;
+  if (!niche) return res.status(400).json({ error: 'niche is required' });
+
+  const prompt = `Analyze the "${niche}" niche on ${platform} social media.
+What are the top creators doing to dominate the algorithm? What content patterns work?
+
+Respond with ONLY JSON:
+{
+  "patterns": ["<pattern 1>", "<pattern 2>", "<pattern 3>", "<pattern 4>", "<pattern 5>"],
+  "contentGaps": ["<underserved topic 1>", "<topic 2>", "<topic 3>"],
+  "formats": ["<video format that works>", "<format 2>", "<format 3>"],
+  "mistakes": ["<common mistake to avoid>", "<mistake 2>", "<mistake 3>"],
+  "growthhack": "<single best strategy to grow fast in this niche right now>"
+}`;
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system: VIRAL_SYSTEM,
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const content = message.content[0].text.trim();
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const data = JSON.parse(jsonMatch ? jsonMatch[0] : content);
+    res.json({ success: true, ...data });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ── fal.ai proxy routes ───────────────────────────────────────────────────────
 // These proxy fal.ai requests through the backend so mobile (iOS Safari) can
 // use Kling/Flux without CORS issues. Requires FAL_API_KEY in .env.
