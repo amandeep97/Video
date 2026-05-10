@@ -9,12 +9,29 @@ import { callAI } from '../services/api.js';
 import { getBackendUrl } from '../services/replicate.js';
 
 const PLATFORMS = [
-  { id: 'all',       label: 'All Platforms', emoji: '🌐' },
-  { id: 'tiktok',    label: 'TikTok',        emoji: '🎵' },
-  { id: 'instagram', label: 'Instagram',     emoji: '📸' },
-  { id: 'youtube',   label: 'YouTube',       emoji: '▶️' },
-  { id: 'facebook',  label: 'Facebook',      emoji: '📘' },
+  { id: 'all',            label: 'All Platforms',  emoji: '🌐' },
+  { id: 'tiktok',         label: 'TikTok',         emoji: '🎵' },
+  { id: 'instagram',      label: 'Instagram',      emoji: '📸' },
+  { id: 'youtube',        label: 'YouTube',        emoji: '▶️' },
+  { id: 'youtube-shorts', label: 'YT Shorts',      emoji: '📱' },
+  { id: 'facebook',       label: 'Facebook',       emoji: '📘' },
+  { id: 'twitter',        label: 'X / Twitter',    emoji: '🐦' },
+  { id: 'linkedin',       label: 'LinkedIn',       emoji: '💼' },
+  { id: 'snapchat',       label: 'Snapchat',       emoji: '👻' },
+  { id: 'pinterest',      label: 'Pinterest',      emoji: '📌' },
+  { id: 'sharechat',      label: 'ShareChat 🇮🇳',   emoji: '🇮🇳' },
+  { id: 'moj',            label: 'Moj',            emoji: '🎬' },
+  { id: 'josh',           label: 'Josh',           emoji: '⚡' },
+  { id: 'threads',        label: 'Threads',        emoji: '🧵' },
+  { id: 'whatsapp',       label: 'WhatsApp',       emoji: '💬' },
 ];
+
+const PLATFORM_EMOJI = {
+  tiktok: '🎵', instagram: '📸', youtube: '▶️',
+  'youtube-shorts': '📱', facebook: '📘', twitter: '🐦',
+  linkedin: '💼', snapchat: '👻', pinterest: '📌',
+  sharechat: '🇮🇳', moj: '🎬', josh: '⚡', threads: '🧵', whatsapp: '💬',
+};
 
 const NICHES = [
   'general', 'entertainment', 'education', 'fitness', 'food', 'travel',
@@ -167,21 +184,40 @@ export default function AlgorithmCracker() {
   const [extraHooks,  setExtraHooks]  = useState([]);
   const [extraTitles, setExtraTitles] = useState([]);
 
-  const buildAnalyzePrompt = () => `Analyze this video topic for viral potential across social media platforms:
+  const getAnalyzePlatforms = () => {
+    if (platform === 'all') return ['tiktok', 'instagram', 'youtube', 'facebook', 'twitter', 'linkedin'];
+    // Focus on selected + 2 top platforms for comparison
+    const tops = ['tiktok', 'instagram', 'youtube'];
+    return [platform, ...tops.filter(p => p !== platform)].slice(0, 3);
+  };
+
+  const buildAnalyzePrompt = () => {
+    const analyzePlatforms = getAnalyzePlatforms();
+    const platformsJson = analyzePlatforms
+      .map(p => `    "${p}": { "score": <0-100>, "tips": ["<tip1>","<tip2>","<tip3>"], "bestTime": "<e.g. 7-9pm>", "bestDays": ["<day1>","<day2>"] }`)
+      .join(',\n');
+    const hashtagsJson = analyzePlatforms
+      .map(p => `    "${p}": ["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8"]`)
+      .join(',\n');
+
+    return `Analyze this video topic for viral potential on social media:
 
 Topic: "${topic.trim()}"
-Target Platform: ${platform}
+Target Platform: ${platform === 'all' ? 'All major platforms' : platform}
 Niche: ${niche}
 
-Respond with ONLY this JSON structure:
+Give platform-specific advice tailored to each platform's algorithm.
+For ShareChat/Moj/Josh: focus on Indian regional language audience.
+For WhatsApp: focus on shareable, forward-worthy content.
+For LinkedIn: focus on professional insight content.
+
+Respond with ONLY this JSON:
 {
   "viralScore": <0-100 integer>,
   "verdict": "<HIGH POTENTIAL|MEDIUM POTENTIAL|LOW POTENTIAL>",
   "viralReason": "<2-3 sentence explanation>",
   "platforms": {
-    "tiktok":    { "score": <0-100>, "tips": ["<tip1>","<tip2>","<tip3>"], "bestTime": "<time>", "bestDays": ["<day1>","<day2>"] },
-    "instagram": { "score": <0-100>, "tips": ["<tip1>","<tip2>","<tip3>"], "bestTime": "<time>", "bestDays": ["<day1>","<day2>"] },
-    "youtube":   { "score": <0-100>, "tips": ["<tip1>","<tip2>","<tip3>"], "bestTime": "<time>", "bestDays": ["<day1>","<day2>"] }
+${platformsJson}
   },
   "hooks": [
     { "type": "Curiosity",  "text": "<scroll-stopping opener>" },
@@ -198,17 +234,16 @@ Respond with ONLY this JSON structure:
     { "type": "Controversy", "text": "<title>" }
   ],
   "hashtags": {
-    "tiktok":    ["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8"],
-    "instagram": ["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8","#tag9","#tag10"],
-    "youtube":   ["#tag1","#tag2","#tag3","#tag4","#tag5"]
+${hashtagsJson}
   },
   "contentAngles": ["<angle 1>","<angle 2>","<angle 3>","<angle 4>","<angle 5>"],
-  "warnings": ["<warning if any>"],
+  "warnings": ["<warning if any, else empty string>"],
   "thumbnailText": { "headline": "<short punchy headline>", "subtext": "<supporting text>" },
   "postingSchedule": "<e.g. 3x per week>",
   "retentionTip": "<single most important retention tip>",
   "competitorInsight": "<what top creators do differently>"
 }`;
+  };
 
   const handleAnalyze = async () => {
     if (!topic.trim()) return;
@@ -385,14 +420,12 @@ Respond with ONLY this JSON structure:
               <div className="space-y-4">
                 {/* Platform scores */}
                 <div className="grid grid-cols-3 gap-3">
-                  {['tiktok', 'instagram', 'youtube'].map(p => {
-                    const pd = analysis.platforms?.[p];
+                  {Object.keys(analysis.platforms || {}).map(p => {
+                    const pd = analysis.platforms[p];
                     if (!pd) return null;
                     return (
                       <div key={p} className="card text-center">
-                        <p className="text-xl mb-1">
-                          {p === 'tiktok' ? '🎵' : p === 'instagram' ? '📸' : '▶️'}
-                        </p>
+                        <p className="text-xl mb-1">{PLATFORM_EMOJI[p] || '📱'}</p>
                         <ScoreRing score={pd.score} size={56} />
                         <p className="text-xs font-semibold capitalize mt-2">{p}</p>
                         <p className="text-[10px] text-white/30 mt-0.5">{pd.bestTime} · {pd.bestDays?.[0]}</p>
@@ -402,13 +435,13 @@ Respond with ONLY this JSON structure:
                 </div>
 
                 {/* Platform tips */}
-                {['tiktok', 'instagram', 'youtube'].map(p => {
-                  const pd = analysis.platforms?.[p];
+                {Object.keys(analysis.platforms || {}).map(p => {
+                  const pd = analysis.platforms[p];
                   if (!pd?.tips?.length) return null;
                   return (
                     <div key={p} className="card">
                       <p className="text-sm font-semibold mb-3 flex items-center gap-2">
-                        <span>{p === 'tiktok' ? '🎵' : p === 'instagram' ? '📸' : '▶️'}</span>
+                        <span>{PLATFORM_EMOJI[p] || '📱'}</span>
                         <span className="capitalize">{p} Algorithm Tips</span>
                       </p>
                       <div className="space-y-2">
@@ -499,14 +532,14 @@ Respond with ONLY this JSON structure:
             {/* ── Hashtags tab ─────────────────────────────────────────── */}
             {activeTab === 'hashtags' && (
               <div className="space-y-4">
-                {['tiktok', 'instagram', 'youtube'].map(p => {
-                  const tags = analysis.hashtags?.[p];
+                {Object.keys(analysis.hashtags || {}).map(p => {
+                  const tags = analysis.hashtags[p];
                   if (!tags?.length) return null;
                   return (
                     <div key={p} className="card">
                       <div className="flex items-center justify-between mb-3">
                         <p className="text-sm font-semibold flex items-center gap-2">
-                          <span>{p === 'tiktok' ? '🎵' : p === 'instagram' ? '📸' : '▶️'}</span>
+                          <span>{PLATFORM_EMOJI[p] || '📱'}</span>
                           <span className="capitalize">{p}</span>
                         </p>
                         <CopyAllBtn items={tags} label={`Copy ${tags.length} tags`} />
@@ -537,13 +570,13 @@ Respond with ONLY this JSON structure:
                     <p className="text-base font-bold text-white">{analysis.postingSchedule}</p>
                   </div>
                 )}
-                {['tiktok', 'instagram', 'youtube'].map(p => {
-                  const pd = analysis.platforms?.[p];
+                {Object.keys(analysis.platforms || {}).map(p => {
+                  const pd = analysis.platforms[p];
                   if (!pd) return null;
                   return (
                     <div key={p} className="card">
                       <p className="text-sm font-semibold mb-3 flex items-center gap-2">
-                        <span>{p === 'tiktok' ? '🎵' : p === 'instagram' ? '📸' : '▶️'}</span>
+                        <span>{PLATFORM_EMOJI[p] || '📱'}</span>
                         <span className="capitalize">{p} Best Times</span>
                       </p>
                       <div className="flex gap-3">
