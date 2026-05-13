@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, Zap, TrendingUp, Hash, Clock, Lightbulb,
   Copy, Check, RefreshCw, Loader2, AlertTriangle, ChevronDown, ChevronUp,
@@ -168,9 +168,16 @@ async function callViralEndpoint(endpoint, body) {
 
 export default function AlgorithmCracker() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  const [topic,     setTopic]     = useState('');
+  const [topic,     setTopic]     = useState(() => searchParams.get('topic') || '');
   const [platform,  setPlatform]  = useState('all');
+
+  // Auto-analyze if topic came from URL (e.g. clicked from Trend Intelligence)
+  useEffect(() => {
+    const t = searchParams.get('topic');
+    if (t) setTopic(t);
+  }, []);
   const [niche,     setNiche]     = useState('general');
   const [showNiche, setShowNiche] = useState(false);
 

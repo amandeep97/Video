@@ -1,11 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Globe, MapPin, Loader2, AlertTriangle, Copy, Check,
   TrendingUp, Lightbulb, Users, Languages, Calendar, Flame,
-  ChevronDown, ChevronUp, Zap, BarChart2, Target
+  ChevronDown, ChevronUp, Zap, BarChart2, Target, Wifi, WifiOff, Key
 } from 'lucide-react';
 import { callAI } from '../services/api.js';
+import { getBackendUrl } from '../services/replicate.js';
+
+// Map region names → ISO country code for Google Trends
+const GEO_CODES = {
+  // India (all states/cities/tiers → IN)
+  default: 'IN',
+  Pakistan: 'PK', Bangladesh: 'BD', Nepal: 'NP', 'Sri Lanka': 'LK',
+  USA: 'US', UK: 'GB', Canada: 'CA', Australia: 'AU',
+  UAE: 'AE', 'Saudi Arabia': 'SA', Global: 'US',
+};
+
+function getGeoCode(region) {
+  return GEO_CODES[region] || GEO_CODES.default;
+}
 
 const REGIONS = [
   { group: 'India – States', items: ['Punjab', 'Haryana', 'Delhi', 'Uttar Pradesh', 'Bihar', 'Rajasthan', 'Maharashtra', 'Gujarat', 'Tamil Nadu', 'Andhra Pradesh', 'Telangana', 'Karnataka', 'Kerala', 'West Bengal', 'Odisha', 'Jharkhand', 'Himachal Pradesh', 'Uttarakhand', 'Madhya Pradesh', 'Chhattisgarh', 'Assam', 'Jammu & Kashmir'] },
@@ -110,7 +124,46 @@ export default function TrendIntelligence() {
   const [result,   setResult]   = useState(null);
   const [activeTab, setActiveTab] = useState('trending');
 
+  // Live trends state
+  const [liveTrends,     setLiveTrends]     = useState([]);
+  const [liveLoading,    setLiveLoading]    = useState(false);
+  const [liveError,      setLiveError]      = useState('');
+  const [ytApiKey,       setYtApiKey]       = useState('');
+  const [showYtKey,      setShowYtKey]      = useState(false);
+  const [ytTrending,     setYtTrending]     = useState([]);
+  const [ytLoading,      setYtLoading]      = useState(false);
+
   const effectiveRegion = customReg.trim() || region;
+  const geo = getGeoCode(effectiveRegion);
+
+  // Auto-fetch Google Trends when region changes
+  useEffect(() => {
+    const backendUrl = getBackendUrl();
+    if (!backendUrl) { setLiveError('no-backend'); return; }
+    setLiveLoading(true);
+    setLiveTrends([]);
+    setLiveError('');
+    fetch(`${backendUrl}/api/trends/google?geo=${geo}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.trends) setLiveTrends(d.trends);
+        else setLiveError(d.error || 'Failed to load');
+      })
+      .catch(() => setLiveError('no-backend'))
+      .finally(() => setLiveLoading(false));
+  }, [geo]);
+
+  const fetchYouTubeTrending = () => {
+    const backendUrl = getBackendUrl();
+    if (!backendUrl || !ytApiKey.trim()) return;
+    setYtLoading(true);
+    setYtTrending([]);
+    fetch(`${backendUrl}/api/trends/youtube?regionCode=${geo}&apiKey=${ytApiKey.trim()}`)
+      .then(r => r.json())
+      .then(d => { if (d.videos) setYtTrending(d.videos); })
+      .catch(() => {})
+      .finally(() => setYtLoading(false));
+  };
 
   const buildPrompt = () => `Analyze content trends for this specific regional audience:
 
@@ -326,6 +379,105 @@ Respond with ONLY this JSON:
                 <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-red-300">{error}</p>
               </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Live Google Trends ─────────────────────────────────────────── */}
+        <div className="card mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              {liveLoading
+                ? <Loader2 className="w-4 h-4 animate-spin text-orange-400" />
+                : liveError === 'no-backend'
+                  ? <WifiOff className="w-4 h-4 text-white/30" />
+                  : <Wifi className="w-4 h-4 text-green-400" />}
+              <span className="text-sm font-semibold text-white">
+                {liveError === 'no-backend' ? 'Google Trends (needs backend)' : `Live Searches in ${geo}`}
+              </span>
+              {!liveError && !liveLoading && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/15 border border-green-500/30 text-green-300 font-medium">LIVE</span>
+              )}
+            </div>
+            <span className="text-[10px] text-white/30">via Google Trends</span>
+          </div>
+
+          {liveError === 'no-backend' && (
+            <p className="text-xs text-white/30 leading-relaxed">
+              Deploy the backend and add its URL in Settings to see real-time Google Trends data for {effectiveRegion}.
+            </p>
+          )}
+
+          {liveLoading && (
+            <div className="flex flex-wrap gap-2">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="h-7 w-24 rounded-full bg-white/5 animate-pulse" />
+              ))}
+            </div>
+          )}
+
+          {!liveLoading && liveTrends.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {liveTrends.slice(0, 15).map((t, i) => (
+                  <button key={i}
+                    onClick={() => navigate(`/viral?topic=${encodeURIComponent(t.title)}`)}
+                    title={`Traffic: ${t.traffic} — click to analyze in Algorithm Cracker`}
+                    className="group flex items-center gap-1.5 px-3 py-1.5 rounded-full glass border border-white/10 hover:border-orange-500/40 hover:bg-orange-500/10 transition-all text-left">
+                    <span className="text-[10px] text-white/30 font-mono w-4">{i + 1}</span>
+                    <span className="text-xs text-white/80 group-hover:text-white">{t.title}</span>
+                    {t.traffic && <span className="text-[10px] text-white/30 group-hover:text-orange-300">{t.traffic}</span>}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-white/20">Click any topic to use it for analysis ↑ · Data from Google Trends</p>
+            </div>
+          )}
+
+          {/* YouTube Trending */}
+          <div className="mt-4 pt-4 border-t border-white/5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold text-white/60 flex items-center gap-1.5">▶️ YouTube Trending in {geo}</span>
+              <button onClick={() => setShowYtKey(s => !s)}
+                className="flex items-center gap-1 text-[10px] text-white/30 hover:text-white/60">
+                <Key className="w-3 h-3" /> {showYtKey ? 'Hide key' : 'Add YouTube API key'}
+              </button>
+            </div>
+
+            {showYtKey && (
+              <div className="flex gap-2 mb-3">
+                <input value={ytApiKey} onChange={e => setYtApiKey(e.target.value)}
+                  placeholder="YouTube Data API v3 key (free from console.cloud.google.com)"
+                  className="input-field text-xs flex-1" />
+                <button onClick={fetchYouTubeTrending} disabled={!ytApiKey.trim() || ytLoading}
+                  className="px-3 py-2 glass glass-hover rounded-xl text-xs text-orange-300 disabled:opacity-40 flex items-center gap-1">
+                  {ytLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Fetch'}
+                </button>
+              </div>
+            )}
+
+            {ytLoading && <div className="text-xs text-white/30 animate-pulse">Loading YouTube trending…</div>}
+
+            {ytTrending.length > 0 && (
+              <div className="space-y-2 max-h-56 overflow-y-auto">
+                {ytTrending.slice(0, 10).map((v, i) => (
+                  <div key={v.id} className="flex items-center gap-3 p-2 glass rounded-xl">
+                    <span className="text-[10px] text-white/30 w-5 flex-shrink-0">#{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-white truncate">{v.title}</p>
+                      <p className="text-[10px] text-white/30">{v.channel} · {Number(v.views).toLocaleString()} views</p>
+                    </div>
+                    <button onClick={() => navigate(`/viral?topic=${encodeURIComponent(v.title)}`)}
+                      className="text-[10px] glass px-2 py-1 rounded-lg text-orange-300 hover:bg-orange-500/10 flex-shrink-0">
+                      Analyze →
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {!showYtKey && ytTrending.length === 0 && !ytLoading && (
+              <p className="text-[10px] text-white/20">Free API key needed · quota: 10,000 requests/day</p>
             )}
           </div>
         </div>
