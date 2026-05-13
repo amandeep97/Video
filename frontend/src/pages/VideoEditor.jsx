@@ -117,10 +117,11 @@ export default function VideoEditor() {
   const rafRef      = useRef(null);
   const audioCtxRef = useRef(null);
 
-  const [videoSrc,  setVideoSrc]  = useState('');
-  const [videoUrl,  setVideoUrl]  = useState('');
-  const [loaded,    setLoaded]    = useState(false);
-  const [loadError, setLoadError] = useState('');
+  const [videoSrc,    setVideoSrc]    = useState('');
+  const [videoUrl,    setVideoUrl]    = useState('');
+  const [loaded,      setLoaded]      = useState(false);
+  const [processing,  setProcessing]  = useState(false);
+  const [loadError,   setLoadError]   = useState('');
   const [duration,  setDuration]  = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [playing,   setPlaying]   = useState(false);
@@ -169,9 +170,12 @@ export default function VideoEditor() {
 
   // ── Canvas render loop ─────────────────────────────────────────────────────
   const renderFrame = useCallback(() => {
+    // Always reschedule FIRST — never let the loop die
+    rafRef.current = requestAnimationFrame(renderFrame);
+
     const canvas = canvasRef.current;
     const video  = videoRef.current;
-    if (!canvas || !video || !video.videoWidth) return;
+    if (!canvas || !video || !video.videoWidth) return; // early exit but loop continues
 
     const cw = canvas.width;
     const ch = canvas.height;
@@ -180,18 +184,12 @@ export default function VideoEditor() {
 
     setCurrentTime(t);
 
-    // Draw video with global filter
     ctx.filter = buildFilter(filterPreset, brightness, contrast, saturation);
     ctx.drawImage(video, 0, 0, cw, ch);
     ctx.filter = 'none';
 
-    // Draw cover/blur regions
     covers.forEach(r => drawCover(ctx, r, cw, ch, video, t));
-
-    // Draw text overlays
     overlays.forEach(o => drawText(ctx, o, cw, ch, t));
-
-    rafRef.current = requestAnimationFrame(renderFrame);
   }, [filterPreset, brightness, contrast, saturation, overlays, covers]);
 
   useEffect(() => {
@@ -203,6 +201,7 @@ export default function VideoEditor() {
   const handleFile = (file) => {
     if (!file) return;
     setLoadError('');
+    setProcessing(true);
     const url = URL.createObjectURL(file);
     setVideoSrc(url);
   };
@@ -220,6 +219,7 @@ export default function VideoEditor() {
     c.height = v.videoHeight || 720;
     setDuration(v.duration);
     setLoaded(true);
+    setProcessing(false);
     setLoadError('');
     setNStart(0);
     setNDur(Math.min(4, v.duration));
@@ -230,6 +230,7 @@ export default function VideoEditor() {
   const handleVideoError = () => {
     setLoadError('Could not load this video. Try a different file (MP4 works best).');
     setVideoSrc('');
+    setProcessing(false);
   };
 
   const togglePlay = () => {
@@ -370,6 +371,13 @@ export default function VideoEditor() {
             onDragOver={e => e.preventDefault()}
             className="card border-2 border-dashed border-white/20 hover:border-brand-500/50 transition-all text-center py-16"
           >
+            {processing && (
+              <div className="flex flex-col items-center gap-3 py-4">
+                <Loader2 className="w-10 h-10 animate-spin text-violet-400" />
+                <p className="text-sm text-white/60">Loading video…</p>
+              </div>
+            )}
+            {!processing && (<>
             <div className="text-5xl mb-4">🎬</div>
             <p className="text-lg font-bold text-white/80 mb-2">Upload your video</p>
             <p className="text-sm text-white/40 mb-6">Works with CapCut, HeyGen, or any video (MP4, MOV, WebM)</p>
@@ -403,6 +411,7 @@ export default function VideoEditor() {
                 </button>
               </div>
             </div>
+            </>)}
           </div>
         )}
 
@@ -417,32 +426,30 @@ export default function VideoEditor() {
           onEnded={() => setPlaying(false)}
         />
 
-        {/* Canvas Preview */}
-        {loaded && (
-          <div className="space-y-2">
-            <canvas ref={canvasRef}
-              className="w-full rounded-2xl border border-white/10 bg-black cursor-pointer"
-              style={{ maxHeight: '55vw', objectFit: 'contain' }}
-              onClick={togglePlay} />
+        {/* Canvas — always in DOM so ref is available in handleVideoLoaded */}
+        <div className={loaded ? 'space-y-2' : 'hidden'}>
+          <canvas ref={canvasRef}
+            className="w-full rounded-2xl border border-white/10 bg-black cursor-pointer"
+            style={{ maxHeight: '55vw', objectFit: 'contain' }}
+            onClick={togglePlay} />
 
-            {/* Controls */}
-            <div className="flex items-center gap-3">
-              <button onClick={togglePlay}
-                className="w-10 h-10 rounded-xl glass glass-hover flex items-center justify-center flex-shrink-0">
-                {playing ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-              </button>
-              <input type="range" min={0} max={100} step={0.1}
-                value={duration > 0 ? (currentTime / duration) * 100 : 0}
-                onChange={seek}
-                className="flex-1 accent-violet-500" />
-              <span className="text-xs text-white/40 tabular-nums flex-shrink-0">{fmt(currentTime)} / {fmt(duration)}</span>
-              <button onClick={() => { setLoaded(false); setVideoSrc(''); setVideoUrl(''); setOverlays([]); setCovers([]); setPlaying(false); setFilterPreset(FILTER_PRESETS[0]); setBrightness(100); setContrast(100); setSaturation(100); setLoadError(''); }}
-                className="w-8 h-8 rounded-lg glass glass-hover flex items-center justify-center flex-shrink-0" title="Load new video">
-                <RefreshCw className="w-3.5 h-3.5 text-white/40" />
-              </button>
-            </div>
+          {/* Controls */}
+          <div className="flex items-center gap-3">
+            <button onClick={togglePlay}
+              className="w-10 h-10 rounded-xl glass glass-hover flex items-center justify-center flex-shrink-0">
+              {playing ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
+            </button>
+            <input type="range" min={0} max={100} step={0.1}
+              value={duration > 0 ? (currentTime / duration) * 100 : 0}
+              onChange={seek}
+              className="flex-1 accent-violet-500" />
+            <span className="text-xs text-white/40 tabular-nums flex-shrink-0">{fmt(currentTime)} / {fmt(duration)}</span>
+            <button onClick={() => { setLoaded(false); setVideoSrc(''); setVideoUrl(''); setOverlays([]); setCovers([]); setPlaying(false); setFilterPreset(FILTER_PRESETS[0]); setBrightness(100); setContrast(100); setSaturation(100); setLoadError(''); }}
+              className="w-8 h-8 rounded-lg glass glass-hover flex items-center justify-center flex-shrink-0" title="Load new video">
+              <RefreshCw className="w-3.5 h-3.5 text-white/40" />
+            </button>
           </div>
-        )}
+        </div>
 
         {/* Tool tabs */}
         {loaded && (

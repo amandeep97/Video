@@ -8,18 +8,36 @@ import {
 import { callAI } from '../services/api.js';
 import { getBackendUrl } from '../services/replicate.js';
 
-// Map region names → ISO country code for Google Trends
+// Map region names → ISO country code for Google Trends / YouTube
 const GEO_CODES = {
-  // India (all states/cities/tiers → IN)
   default: 'IN',
   Pakistan: 'PK', Bangladesh: 'BD', Nepal: 'NP', 'Sri Lanka': 'LK',
   USA: 'US', UK: 'GB', Canada: 'CA', Australia: 'AU',
   UAE: 'AE', 'Saudi Arabia': 'SA', Global: 'US',
 };
+function getGeoCode(region) { return GEO_CODES[region] || GEO_CODES.default; }
 
-function getGeoCode(region) {
-  return GEO_CODES[region] || GEO_CODES.default;
-}
+// Reddit subreddits for live trending topics — works without any backend/API key
+const REGION_SUBREDDITS = {
+  Punjab:           ['punjab', 'india', 'bollywood'],
+  Haryana:          ['india', 'bollywood', 'cricket'],
+  Delhi:            ['delhi', 'india', 'IndianStreetFood'],
+  'Uttar Pradesh':  ['india', 'cricket', 'bollywood'],
+  Bihar:            ['india', 'cricket', 'bollywood'],
+  Maharashtra:      ['mumbai', 'pune', 'india'],
+  Gujarat:          ['india', 'cricket', 'bollywood'],
+  'Tamil Nadu':     ['Chennai', 'kollywood', 'india'],
+  Karnataka:        ['bangalore', 'india', 'cricket'],
+  'West Bengal':    ['kolkata', 'india', 'cricket'],
+  Mumbai:           ['mumbai', 'india', 'bollywood'],
+  Bengaluru:        ['bangalore', 'india', 'tech'],
+  Pakistan:         ['pakistan', 'cricket', 'PakistanPolitics'],
+  USA:              ['worldnews', 'news', 'AskReddit'],
+  UK:               ['unitedkingdom', 'worldnews', 'news'],
+  Global:           ['worldnews', 'AskReddit', 'technology'],
+  default:          ['india', 'bollywood', 'cricket'],
+};
+function getSubreddits(region) { return REGION_SUBREDDITS[region] || REGION_SUBREDDITS.default; }
 
 const REGIONS = [
   { group: 'India – States', items: ['Punjab', 'Haryana', 'Delhi', 'Uttar Pradesh', 'Bihar', 'Rajasthan', 'Maharashtra', 'Gujarat', 'Tamil Nadu', 'Andhra Pradesh', 'Telangana', 'Karnataka', 'Kerala', 'West Bengal', 'Odisha', 'Jharkhand', 'Himachal Pradesh', 'Uttarakhand', 'Madhya Pradesh', 'Chhattisgarh', 'Assam', 'Jammu & Kashmir'] },
@@ -125,33 +143,51 @@ export default function TrendIntelligence() {
   const [activeTab, setActiveTab] = useState('trending');
 
   // Live trends state
-  const [liveTrends,     setLiveTrends]     = useState([]);
-  const [liveLoading,    setLiveLoading]    = useState(false);
-  const [liveError,      setLiveError]      = useState('');
-  const [ytApiKey,       setYtApiKey]       = useState('');
-  const [showYtKey,      setShowYtKey]      = useState(false);
-  const [ytTrending,     setYtTrending]     = useState([]);
-  const [ytLoading,      setYtLoading]      = useState(false);
+  const [redditPosts,  setRedditPosts]  = useState([]);
+  const [redditLoading,setRedditLoading]= useState(false);
+  const [ytApiKey,     setYtApiKey]     = useState('');
+  const [showYtKey,    setShowYtKey]    = useState(false);
+  const [ytTrending,   setYtTrending]   = useState([]);
+  const [ytLoading,    setYtLoading]    = useState(false);
+  // Google Trends (needs backend)
+  const [gTrends,      setGTrends]      = useState([]);
+  const [gTrendsErr,   setGTrendsErr]   = useState('');
 
   const effectiveRegion = customReg.trim() || region;
   const geo = getGeoCode(effectiveRegion);
 
-  // Auto-fetch Google Trends when region changes
+  // Auto-fetch Reddit hot posts — works without any backend or API key
   useEffect(() => {
-    const backendUrl = getBackendUrl();
-    if (!backendUrl) { setLiveError('no-backend'); return; }
-    setLiveLoading(true);
-    setLiveTrends([]);
-    setLiveError('');
-    fetch(`${backendUrl}/api/trends/google?geo=${geo}`)
+    setRedditLoading(true);
+    setRedditPosts([]);
+    const subs = getSubreddits(effectiveRegion);
+    const sub = subs[0]; // use primary subreddit
+    fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=15`)
       .then(r => r.json())
       .then(d => {
-        if (d.trends) setLiveTrends(d.trends);
-        else setLiveError(d.error || 'Failed to load');
+        const posts = (d?.data?.children || [])
+          .map(c => c.data)
+          .filter(p => !p.stickied && p.score > 50)
+          .slice(0, 12)
+          .map(p => ({ title: p.title, score: p.score, comments: p.num_comments, sub: p.subreddit }));
+        setRedditPosts(posts);
       })
-      .catch(() => setLiveError('no-backend'))
-      .finally(() => setLiveLoading(false));
-  }, [geo]);
+      .catch(() => {})
+      .finally(() => setRedditLoading(false));
+
+    // Also try Google Trends via backend if available
+    const backendUrl = getBackendUrl();
+    if (backendUrl) {
+      setGTrends([]);
+      setGTrendsErr('');
+      fetch(`${backendUrl}/api/trends/google?geo=${geo}`)
+        .then(r => r.json())
+        .then(d => { if (d.trends) setGTrends(d.trends); else setGTrendsErr('unavailable'); })
+        .catch(() => setGTrendsErr('unavailable'));
+    } else {
+      setGTrendsErr('no-backend');
+    }
+  }, [effectiveRegion, geo]);
 
   const fetchYouTubeTrending = () => {
     const backendUrl = getBackendUrl();
@@ -383,101 +419,103 @@ Respond with ONLY this JSON:
           </div>
         </div>
 
-        {/* ── Live Google Trends ─────────────────────────────────────────── */}
-        <div className="card mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              {liveLoading
-                ? <Loader2 className="w-4 h-4 animate-spin text-orange-400" />
-                : liveError === 'no-backend'
-                  ? <WifiOff className="w-4 h-4 text-white/30" />
-                  : <Wifi className="w-4 h-4 text-green-400" />}
-              <span className="text-sm font-semibold text-white">
-                {liveError === 'no-backend' ? 'Google Trends (needs backend)' : `Live Searches in ${geo}`}
-              </span>
-              {!liveError && !liveLoading && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/15 border border-green-500/30 text-green-300 font-medium">LIVE</span>
-              )}
-            </div>
-            <span className="text-[10px] text-white/30">via Google Trends</span>
+        {/* ── Live Trending Data ─────────────────────────────────────────── */}
+        <div className="card mb-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-bold text-white">Live Trending Now</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/15 border border-green-500/30 text-green-300">LIVE · No backend needed</span>
           </div>
 
-          {liveError === 'no-backend' && (
-            <p className="text-xs text-white/30 leading-relaxed">
-              Deploy the backend and add its URL in Settings to see real-time Google Trends data for {effectiveRegion}.
+          {/* Reddit hot posts — works on any device, no API key */}
+          <div>
+            <p className="text-xs text-white/40 mb-2 flex items-center gap-1.5">
+              {redditLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Flame className="w-3 h-3 text-orange-400" />}
+              Hot on r/{getSubreddits(effectiveRegion)[0]} right now
             </p>
-          )}
-
-          {liveLoading && (
-            <div className="flex flex-wrap gap-2">
-              {[...Array(8)].map((_, i) => (
-                <div key={i} className="h-7 w-24 rounded-full bg-white/5 animate-pulse" />
-              ))}
-            </div>
-          )}
-
-          {!liveLoading && liveTrends.length > 0 && (
-            <div className="space-y-3">
+            {redditLoading && (
               <div className="flex flex-wrap gap-2">
-                {liveTrends.slice(0, 15).map((t, i) => (
+                {[...Array(6)].map((_, i) => <div key={i} className="h-7 w-32 rounded-full bg-white/5 animate-pulse" />)}
+              </div>
+            )}
+            {!redditLoading && redditPosts.length > 0 && (
+              <div className="space-y-1.5">
+                {redditPosts.map((p, i) => (
+                  <button key={i}
+                    onClick={() => navigate(`/viral?topic=${encodeURIComponent(p.title)}`)}
+                    className="w-full flex items-center gap-3 p-2.5 glass rounded-xl border border-white/5 hover:border-orange-500/30 hover:bg-orange-500/5 transition-all text-left group">
+                    <span className="text-[10px] text-white/25 w-5 flex-shrink-0 font-mono">{i+1}</span>
+                    <p className="text-xs text-white/80 flex-1 leading-snug group-hover:text-white line-clamp-2">{p.title}</p>
+                    <div className="flex-shrink-0 text-right">
+                      <p className="text-[10px] text-orange-300">▲ {p.score.toLocaleString()}</p>
+                      <p className="text-[9px] text-white/20">Analyze →</p>
+                    </div>
+                  </button>
+                ))}
+                <p className="text-[10px] text-white/20 pt-1">Tap any topic → get full viral analysis in Algorithm Cracker</p>
+              </div>
+            )}
+          </div>
+
+          {/* Google Trends (needs backend) */}
+          {gTrends.length > 0 && (
+            <div className="pt-3 border-t border-white/5">
+              <p className="text-xs text-white/40 mb-2 flex items-center gap-1.5">
+                <Wifi className="w-3 h-3 text-green-400" /> Google Trending Searches in {geo}
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {gTrends.slice(0, 12).map((t, i) => (
                   <button key={i}
                     onClick={() => navigate(`/viral?topic=${encodeURIComponent(t.title)}`)}
-                    title={`Traffic: ${t.traffic} — click to analyze in Algorithm Cracker`}
-                    className="group flex items-center gap-1.5 px-3 py-1.5 rounded-full glass border border-white/10 hover:border-orange-500/40 hover:bg-orange-500/10 transition-all text-left">
-                    <span className="text-[10px] text-white/30 font-mono w-4">{i + 1}</span>
-                    <span className="text-xs text-white/80 group-hover:text-white">{t.title}</span>
-                    {t.traffic && <span className="text-[10px] text-white/30 group-hover:text-orange-300">{t.traffic}</span>}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full glass border border-white/10 hover:border-green-500/30 text-xs text-white/70 hover:text-white transition-all">
+                    {t.title} {t.traffic && <span className="text-[9px] text-green-400">{t.traffic}</span>}
                   </button>
                 ))}
               </div>
-              <p className="text-[10px] text-white/20">Click any topic to use it for analysis ↑ · Data from Google Trends</p>
             </div>
+          )}
+          {gTrendsErr === 'no-backend' && (
+            <p className="text-[10px] text-white/20 pt-2 border-t border-white/5">
+              + Google Trends live data available after deploying backend
+            </p>
           )}
 
           {/* YouTube Trending */}
-          <div className="mt-4 pt-4 border-t border-white/5">
+          <div className="pt-3 border-t border-white/5">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-white/60 flex items-center gap-1.5">▶️ YouTube Trending in {geo}</span>
+              <span className="text-xs text-white/50 flex items-center gap-1.5">▶️ YouTube Trending in {geo}</span>
               <button onClick={() => setShowYtKey(s => !s)}
                 className="flex items-center gap-1 text-[10px] text-white/30 hover:text-white/60">
-                <Key className="w-3 h-3" /> {showYtKey ? 'Hide key' : 'Add YouTube API key'}
+                <Key className="w-3 h-3" /> {showYtKey ? 'Hide' : 'Add free API key'}
               </button>
             </div>
-
             {showYtKey && (
-              <div className="flex gap-2 mb-3">
+              <div className="flex gap-2">
                 <input value={ytApiKey} onChange={e => setYtApiKey(e.target.value)}
-                  placeholder="YouTube Data API v3 key (free from console.cloud.google.com)"
+                  placeholder="YouTube Data API v3 key — free from console.cloud.google.com"
                   className="input-field text-xs flex-1" />
                 <button onClick={fetchYouTubeTrending} disabled={!ytApiKey.trim() || ytLoading}
                   className="px-3 py-2 glass glass-hover rounded-xl text-xs text-orange-300 disabled:opacity-40 flex items-center gap-1">
-                  {ytLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Fetch'}
+                  {ytLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Load'}
                 </button>
               </div>
             )}
-
-            {ytLoading && <div className="text-xs text-white/30 animate-pulse">Loading YouTube trending…</div>}
-
             {ytTrending.length > 0 && (
-              <div className="space-y-2 max-h-56 overflow-y-auto">
-                {ytTrending.slice(0, 10).map((v, i) => (
+              <div className="space-y-1.5 mt-2 max-h-48 overflow-y-auto">
+                {ytTrending.slice(0, 8).map((v, i) => (
                   <div key={v.id} className="flex items-center gap-3 p-2 glass rounded-xl">
-                    <span className="text-[10px] text-white/30 w-5 flex-shrink-0">#{i + 1}</span>
+                    <span className="text-[10px] text-white/25 w-4">#{i+1}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-white truncate">{v.title}</p>
-                      <p className="text-[10px] text-white/30">{v.channel} · {Number(v.views).toLocaleString()} views</p>
+                      <p className="text-[10px] text-white/30">{Number(v.views).toLocaleString()} views · {v.channel}</p>
                     </div>
                     <button onClick={() => navigate(`/viral?topic=${encodeURIComponent(v.title)}`)}
-                      className="text-[10px] glass px-2 py-1 rounded-lg text-orange-300 hover:bg-orange-500/10 flex-shrink-0">
-                      Analyze →
-                    </button>
+                      className="text-[10px] glass px-2 py-1 rounded text-orange-300 flex-shrink-0">Analyze</button>
                   </div>
                 ))}
               </div>
             )}
-
-            {!showYtKey && ytTrending.length === 0 && !ytLoading && (
-              <p className="text-[10px] text-white/20">Free API key needed · quota: 10,000 requests/day</p>
+            {!showYtKey && !ytTrending.length && (
+              <p className="text-[10px] text-white/20">Free quota: 10,000 requests/day · no billing needed</p>
             )}
           </div>
         </div>
