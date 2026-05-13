@@ -116,11 +116,11 @@ export default function VideoEditor() {
   const canvasRef   = useRef(null);
   const rafRef      = useRef(null);
   const audioCtxRef = useRef(null);
-  const fileInputRef = useRef(null);
 
   const [videoSrc,  setVideoSrc]  = useState('');
   const [videoUrl,  setVideoUrl]  = useState('');
   const [loaded,    setLoaded]    = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [duration,  setDuration]  = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [playing,   setPlaying]   = useState(false);
@@ -200,18 +200,11 @@ export default function VideoEditor() {
   }, [renderFrame]);
 
   // ── Video load ─────────────────────────────────────────────────────────────
-  const loadVideo = (src) => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.src = src;
-    video.load();
-  };
-
   const handleFile = (file) => {
-    if (!file || !file.type.startsWith('video/')) return;
+    if (!file) return;
+    setLoadError('');
     const url = URL.createObjectURL(file);
     setVideoSrc(url);
-    loadVideo(url);
   };
 
   const handleDrop = (e) => {
@@ -227,10 +220,16 @@ export default function VideoEditor() {
     c.height = v.videoHeight || 720;
     setDuration(v.duration);
     setLoaded(true);
+    setLoadError('');
     setNStart(0);
     setNDur(Math.min(4, v.duration));
     setCStart(0);
     setCEnd(null);
+  };
+
+  const handleVideoError = () => {
+    setLoadError('Could not load this video. Try a different file (MP4 works best).');
+    setVideoSrc('');
   };
 
   const togglePlay = () => {
@@ -369,29 +368,36 @@ export default function VideoEditor() {
           <div
             onDrop={handleDrop}
             onDragOver={e => e.preventDefault()}
-            className="card border-2 border-dashed border-white/20 hover:border-brand-500/50 transition-all text-center py-16 cursor-pointer"
-            onClick={() => fileInputRef.current?.click()}
+            className="card border-2 border-dashed border-white/20 hover:border-brand-500/50 transition-all text-center py-16"
           >
-            <input ref={fileInputRef} type="file" accept="video/*" className="hidden"
-              onChange={e => handleFile(e.target.files[0])} />
             <div className="text-5xl mb-4">🎬</div>
-            <p className="text-lg font-bold text-white/80 mb-2">Drop your video here</p>
-            <p className="text-sm text-white/40 mb-6">Works with CapCut, HeyGen, or any video file (MP4, MOV, WebM)</p>
+            <p className="text-lg font-bold text-white/80 mb-2">Upload your video</p>
+            <p className="text-sm text-white/40 mb-6">Works with CapCut, HeyGen, or any video (MP4, MOV, WebM)</p>
+
+            {loadError && (
+              <div className="mb-4 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-300 max-w-sm mx-auto">
+                {loadError}
+              </div>
+            )}
+
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-              <button className="btn-primary px-6 py-2.5 flex items-center gap-2">
+              {/* Label-based file picker — most reliable on iOS */}
+              <label className="btn-primary px-6 py-2.5 flex items-center gap-2 cursor-pointer">
                 <Upload className="w-4 h-4" /> Upload Video File
-              </button>
+                <input type="file" accept="video/*,video/mp4,video/quicktime,video/webm"
+                  className="absolute opacity-0 w-0 h-0"
+                  onChange={e => handleFile(e.target.files[0])} />
+              </label>
               <span className="text-white/30 text-sm">or</span>
               <div className="flex gap-2 w-full sm:w-auto">
                 <input
                   value={videoUrl}
                   onChange={e => setVideoUrl(e.target.value)}
-                  onClick={e => e.stopPropagation()}
                   placeholder="Paste video URL…"
                   className="input-field text-sm flex-1 sm:w-64"
                 />
                 <button
-                  onClick={e => { e.stopPropagation(); if (videoUrl.trim()) { setVideoSrc(videoUrl.trim()); loadVideo(videoUrl.trim()); }}}
+                  onClick={() => { if (videoUrl.trim()) { setLoadError(''); setVideoSrc(videoUrl.trim()); }}}
                   className="px-4 py-2 glass glass-hover rounded-xl text-sm flex items-center gap-1">
                   <Link className="w-4 h-4" /> Load
                 </button>
@@ -400,10 +406,16 @@ export default function VideoEditor() {
           </div>
         )}
 
-        {/* Hidden video element — source for canvas */}
-        <video ref={videoRef} className="hidden" crossOrigin="anonymous"
+        {/* Video element — src bound as React prop so it always updates */}
+        <video
+          ref={videoRef}
+          src={videoSrc || undefined}
+          className="hidden"
+          playsInline
           onLoadedMetadata={handleVideoLoaded}
-          onEnded={() => setPlaying(false)} />
+          onError={handleVideoError}
+          onEnded={() => setPlaying(false)}
+        />
 
         {/* Canvas Preview */}
         {loaded && (
@@ -424,7 +436,7 @@ export default function VideoEditor() {
                 onChange={seek}
                 className="flex-1 accent-violet-500" />
               <span className="text-xs text-white/40 tabular-nums flex-shrink-0">{fmt(currentTime)} / {fmt(duration)}</span>
-              <button onClick={() => { setLoaded(false); setVideoSrc(''); setOverlays([]); setCovers([]); setPlaying(false); setFilterPreset(FILTER_PRESETS[0]); setBrightness(100); setContrast(100); setSaturation(100); }}
+              <button onClick={() => { setLoaded(false); setVideoSrc(''); setVideoUrl(''); setOverlays([]); setCovers([]); setPlaying(false); setFilterPreset(FILTER_PRESETS[0]); setBrightness(100); setContrast(100); setSaturation(100); setLoadError(''); }}
                 className="w-8 h-8 rounded-lg glass glass-hover flex items-center justify-center flex-shrink-0" title="Load new video">
                 <RefreshCw className="w-3.5 h-3.5 text-white/40" />
               </button>
