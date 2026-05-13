@@ -708,6 +708,71 @@ app.post('/api/fal/image-to-video', async (req, res) => {
   }
 });
 
+// ── Real Trending Data ────────────────────────────────────────────────────────
+
+/**
+ * GET /api/trends/google?geo=IN
+ * Proxies Google Trends daily trending searches RSS for a country.
+ * No API key needed — uses the public RSS feed.
+ */
+app.get('/api/trends/google', async (req, res) => {
+  const geo = (req.query.geo || 'IN').toUpperCase();
+  try {
+    const response = await fetch(
+      `https://trends.google.com/trends/trendingsearches/daily/rss?geo=${geo}`,
+      { headers: { 'User-Agent': 'Mozilla/5.0' } }
+    );
+    if (!response.ok) throw new Error(`Google Trends returned ${response.status}`);
+    const xml = await response.text();
+
+    // Parse RSS XML — extract <title> and <ht:approx_traffic> from <item> blocks
+    const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 20).map(m => {
+      const block = m[1];
+      const title = (block.match(/<title>(.*?)<\/title>/) || [])[1] || '';
+      const traffic = (block.match(/<ht:approx_traffic>(.*?)<\/ht:approx_traffic>/) || [])[1] || '';
+      const news = [...block.matchAll(/<ht:news_item_title>(.*?)<\/ht:news_item_title>/g)]
+        .slice(0, 1).map(n => n[1]);
+      return { title, traffic, news };
+    }).filter(i => i.title);
+
+    res.json({ success: true, geo, trends: items });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * GET /api/trends/youtube?regionCode=IN&categoryId=0&apiKey=...
+ * Returns top trending YouTube videos for a country using YouTube Data API v3.
+ * apiKey: user's own YouTube Data API key (free — 10,000 quota/day).
+ */
+app.get('/api/trends/youtube', async (req, res) => {
+  const { regionCode = 'IN', categoryId = '0', apiKey } = req.query;
+  if (!apiKey && !process.env.YOUTUBE_API_KEY) {
+    return res.status(400).json({ error: 'YouTube API key required. Pass ?apiKey=YOUR_KEY or set YOUTUBE_API_KEY in .env' });
+  }
+  const key = apiKey || process.env.YOUTUBE_API_KEY;
+  try {
+    const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=${regionCode}&videoCategoryId=${categoryId}&maxResults=20&key=${key}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.error) return res.status(400).json({ error: data.error.message });
+    const videos = data.items.map(v => ({
+      id: v.id,
+      title: v.snippet.title,
+      channel: v.snippet.channelTitle,
+      views: parseInt(v.statistics.viewCount || 0),
+      likes: parseInt(v.statistics.likeCount || 0),
+      thumbnail: v.snippet.thumbnails.medium?.url,
+      publishedAt: v.snippet.publishedAt,
+      tags: v.snippet.tags?.slice(0, 5) || [],
+    }));
+    res.json({ success: true, regionCode, videos });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
