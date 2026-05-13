@@ -161,19 +161,27 @@ export default function TrendIntelligence() {
     setRedditLoading(true);
     setRedditPosts([]);
     const subs = getSubreddits(effectiveRegion);
-    const sub = subs[0]; // use primary subreddit
-    fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=15`)
-      .then(r => r.json())
-      .then(d => {
-        const posts = (d?.data?.children || [])
-          .map(c => c.data)
-          .filter(p => !p.stickied && p.score > 50)
-          .slice(0, 12)
-          .map(p => ({ title: p.title, score: p.score, comments: p.num_comments, sub: p.subreddit }));
-        setRedditPosts(posts);
-      })
-      .catch(() => {})
-      .finally(() => setRedditLoading(false));
+
+    // Try subreddits in order, stop when we get enough posts
+    const tryFetch = async () => {
+      for (const sub of subs) {
+        try {
+          const r = await fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=20`);
+          const d = await r.json();
+          const posts = (d?.data?.children || [])
+            .map(c => c.data)
+            .filter(p => !p.stickied)
+            .slice(0, 10)
+            .map(p => ({ title: p.title, score: p.score, comments: p.num_comments, sub: p.subreddit }));
+          if (posts.length >= 5) {
+            setRedditPosts(posts);
+            return;
+          }
+        } catch { /* try next */ }
+      }
+    };
+
+    tryFetch().finally(() => setRedditLoading(false));
 
     // Also try Google Trends via backend if available
     const backendUrl = getBackendUrl();
@@ -422,8 +430,11 @@ Respond with ONLY this JSON:
         {/* ── Live Trending Data ─────────────────────────────────────────── */}
         <div className="card mb-6 space-y-4">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-bold text-white">Live Trending Now</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/15 border border-green-500/30 text-green-300">LIVE · No backend needed</span>
+            <div>
+              <span className="text-sm font-bold text-white">Live Trending Now</span>
+              <p className="text-[10px] text-white/30 mt-0.5">Real posts from Reddit — not AI guesses</p>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/15 border border-green-500/30 text-green-300">LIVE</span>
           </div>
 
           {/* Reddit hot posts — works on any device, no API key */}
@@ -559,7 +570,10 @@ Respond with ONLY this JSON:
             {/* Trending Now */}
             {activeTab === 'trending' && (
               <div className="space-y-3">
-                <p className="text-xs text-white/40">What {effectiveRegion} audiences are watching right now on {platform}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-white/40 flex-1">What {effectiveRegion} audiences are watching right now on {platform}</p>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/15 border border-yellow-500/20 text-yellow-400 flex-shrink-0">🤖 AI Predicted</span>
+                </div>
                 {result.trending?.map((item, i) => (
                   <div key={i} className="card glass-hover">
                     <div className="flex items-start gap-3">
