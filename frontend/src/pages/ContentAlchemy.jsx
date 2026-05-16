@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Wand2, Zap, ChevronRight, RefreshCw, Video, Sparkles, ArrowLeft, Star, Heart } from 'lucide-react';
+import { Wand2, Zap, ChevronRight, RefreshCw, Video, Sparkles, ArrowLeft, Star, Heart, ClipboardCopy, Check, X } from 'lucide-react';
 import { callAI } from '../services/api.js';
 
 const NICHES = [
@@ -89,6 +89,82 @@ async function fetchTrending(region) {
   return results.slice(0, 12);
 }
 
+function ScriptModal({ script, title, onClose }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(script);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      const el = document.createElement('textarea');
+      el.value = script;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full sm:max-w-2xl max-h-[92vh] flex flex-col rounded-t-2xl sm:rounded-2xl bg-dark-900 border border-white/10 shadow-2xl">
+
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
+          <div>
+            <div className="text-xs text-amber-400 font-mono mb-0.5">📋 PRODUCTION SCRIPT</div>
+            <p className="font-bold text-sm text-white leading-tight">{title}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={handleCopy}
+              className={`flex items-center gap-2 py-2 px-4 rounded-xl text-sm font-semibold transition-all ${
+                copied
+                  ? 'bg-green-500/20 border border-green-500/50 text-green-400'
+                  : 'bg-amber-500/20 border border-amber-500/50 text-amber-300 hover:bg-amber-500/30'
+              }`}>
+              {copied ? <><Check className="w-4 h-4" /> Copied!</> : <><ClipboardCopy className="w-4 h-4" /> Copy All</>}
+            </button>
+            <button onClick={onClose} className="p-2 rounded-xl glass glass-hover text-white/50 hover:text-white">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Hint */}
+        <div className="px-4 pt-3 pb-2 shrink-0">
+          <p className="text-xs text-white/40 text-center">
+            Paste this directly into <span className="text-white/60">HeyGen</span> · <span className="text-white/60">CapCut</span> · <span className="text-white/60">InVideo</span> · <span className="text-white/60">Pictory</span> or any AI video tool
+          </p>
+        </div>
+
+        {/* Script body */}
+        <div className="flex-1 overflow-y-auto px-4 pb-4">
+          <pre className="whitespace-pre-wrap font-mono text-xs text-white/80 leading-relaxed bg-black/30 rounded-xl p-4 border border-white/5 select-all">
+            {script}
+          </pre>
+        </div>
+
+        {/* Sticky copy at bottom */}
+        <div className="p-4 border-t border-white/10 shrink-0">
+          <button onClick={handleCopy}
+            className={`w-full py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 transition-all ${
+              copied
+                ? 'bg-green-500/20 border border-green-500/40 text-green-400'
+                : 'btn-primary'
+            }`}>
+            {copied ? <><Check className="w-4 h-4" /> Copied to clipboard!</> : <><ClipboardCopy className="w-4 h-4" /> Copy Full Script</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ContentAlchemy() {
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
@@ -104,6 +180,8 @@ export default function ContentAlchemy() {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [expandedCard, setExpandedCard] = useState(null);
+  const [scriptModal, setScriptModal] = useState(null);
+  const [scriptLoadingIdx, setScriptLoadingIdx] = useState(null);
 
   const actualNiche = niche === 'custom' ? customNiche : niche;
   const activeTrend = selectedTrend || manualTrend;
@@ -166,6 +244,87 @@ Make titles punchy and highly clickable. Hooks must grab instantly. Be creative 
     }
   };
 
+  const handleCopyScript = async (r, idx) => {
+    setScriptLoadingIdx(idx);
+
+    const prompt = `You are a professional video scriptwriter. Write a complete, production-ready video script.
+
+TITLE: ${r.title}
+PLATFORM: ${r.bestPlatform}
+FORMAT: ${r.contentFormat}
+OPENING HOOK: ${r.hook}
+NICHE: ${actualNiche}
+TRENDING TOPIC: ${activeTrend}
+TONE/EMOTION: ${r.emotion}
+
+Write the COMPLETE script in this EXACT format — the creator will paste this directly into HeyGen, CapCut, InVideo, or any AI video maker:
+
+═══════════════════════════════════════
+📋 VIDEO SCRIPT — PASTE READY
+═══════════════════════════════════════
+🎬 TITLE: ${r.title}
+📱 PLATFORM: ${r.bestPlatform}
+⏱ DURATION: ${r.contentFormat}
+🎭 TONE: ${r.emotion}
+═══════════════════════════════════════
+
+【HOOK — 0:00 to 0:03】
+SPEAK: "[exact words — make it a pattern interrupt, very punchy]"
+TEXT ON SCREEN: "[bold 3-5 word overlay]"
+VISUAL: [describe exactly what to show on screen]
+
+【SCENE 1 — 0:03 to 0:15】
+SPEAK: "[narration — exact conversational words]"
+TEXT ON SCREEN: "[key point in 5 words or less]"
+VISUAL: [b-roll / stock footage description]
+
+【SCENE 2 — 0:15 to 0:30】
+SPEAK: "[narration]"
+TEXT ON SCREEN: "[key point]"
+VISUAL: [visual suggestion]
+
+【SCENE 3 — 0:30 to 0:50】
+SPEAK: "[narration]"
+TEXT ON SCREEN: "[key point]"
+VISUAL: [visual suggestion]
+
+【CALL TO ACTION — 0:50 to end】
+SPEAK: "[compelling CTA — urgent, clear]"
+TEXT ON SCREEN: "[CTA text]"
+VISUAL: [visual suggestion]
+
+═══════════════════════════════════════
+📝 CAPTION (copy-paste ready)
+═══════════════════════════════════════
+[Write 2-3 sentence engaging caption with emojis, optimized for ${r.bestPlatform}]
+
+#️⃣ HASHTAGS
+[Write 15 relevant hashtags separated by spaces]
+
+═══════════════════════════════════════
+⚙️ SETTINGS FOR ${r.bestPlatform}
+═══════════════════════════════════════
+• Aspect Ratio: [e.g. 9:16 for Reels]
+• Ideal Duration: [specific seconds]
+• Best Post Time: [day + time in IST]
+• Music Vibe: [describe audio style]
+• Thumbnail/Cover Text: [suggested text overlay for cover frame]
+• First Comment (pin this): [write a comment that boosts engagement]
+• Hook Style: [e.g. text appears 0.5s in, zoom transition]
+═══════════════════════════════════════
+
+Write SPEAK lines as natural conversational speech. Make every word count.`;
+
+    try {
+      const script = await callAI(prompt, 'Write the complete video script.', 2000);
+      setScriptModal({ title: r.title, script });
+    } catch {
+      setError('Could not generate script. Check your API key.');
+    } finally {
+      setScriptLoadingIdx(null);
+    }
+  };
+
   const handleCreateVideo = (r) => {
     const params = new URLSearchParams({ topic: r.title, style: 'cinematic', duration: '60' });
     navigate(`/create?${params}`);
@@ -215,12 +374,11 @@ Make titles punchy and highly clickable. Hooks must grab instantly. Be creative 
               <div className="text-5xl mb-4">⚗️</div>
               <h1 className="text-3xl font-black mb-2">Content Alchemy Lab</h1>
               <p className="text-white/50 max-w-lg mx-auto text-sm">
-                Mix your niche with live trending topics → get 5 viral angles nobody else is making
+                Mix your niche with live trending topics → get 5 viral angles + full copy-ready scripts
               </p>
             </div>
 
             <div className="card space-y-6">
-              {/* Niche */}
               <div>
                 <label className="text-sm text-white/50 mb-3 block">What's your content niche?</label>
                 <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-3">
@@ -250,7 +408,6 @@ Make titles punchy and highly clickable. Hooks must grab instantly. Be creative 
                 )}
               </div>
 
-              {/* Platform */}
               <div>
                 <label className="text-sm text-white/50 mb-3 block">Target platform</label>
                 <div className="flex flex-wrap gap-2">
@@ -268,7 +425,6 @@ Make titles punchy and highly clickable. Hooks must grab instantly. Be creative 
                 </div>
               </div>
 
-              {/* Region */}
               <div>
                 <label className="text-sm text-white/50 mb-3 block">Your region (for live trending topics)</label>
                 <div className="flex flex-wrap gap-2">
@@ -363,8 +519,9 @@ Make titles punchy and highly clickable. Hooks must grab instantly. Be creative 
               <p className="text-white/50 text-sm">
                 <span className="text-amber-400">{actualNiche}</span>
                 {' × '}
-                <span className="text-cyan-400">"{(activeTrend || '').slice(0, 50)}{activeTrend?.length > 50 ? '…' : ''}"</span>
+                <span className="text-cyan-400">"{(activeTrend || '').slice(0, 50)}{(activeTrend || '').length > 50 ? '…' : ''}"</span>
               </p>
+              <p className="text-xs text-white/30 mt-1">Tap any card to expand → Copy full script for HeyGen / CapCut</p>
             </div>
 
             <div className="space-y-3">
@@ -430,17 +587,27 @@ Make titles punchy and highly clickable. Hooks must grab instantly. Be creative 
                         </div>
                       </div>
 
-                      <div className="flex gap-2 pt-1">
-                        <button onClick={() => handleCreateVideo(r)}
-                          className="btn-primary flex-1 py-2.5 text-sm flex items-center justify-center gap-2">
-                          <Video className="w-4 h-4" />
-                          Generate Full Script
+                      {/* Action buttons */}
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <button
+                          onClick={() => handleCopyScript(r, i)}
+                          disabled={scriptLoadingIdx === i}
+                          className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 transition-all text-sm font-semibold disabled:opacity-60">
+                          {scriptLoadingIdx === i
+                            ? <><RefreshCw className="w-4 h-4 animate-spin" /> Writing...</>
+                            : <><ClipboardCopy className="w-4 h-4" /> Copy Script</>
+                          }
                         </button>
-                        <button onClick={generate} disabled={generating}
-                          className="btn-secondary py-2.5 px-4 text-sm" title="Regenerate">
-                          <RefreshCw className={`w-4 h-4 ${generating ? 'animate-spin' : ''}`} />
+                        <button onClick={() => handleCreateVideo(r)}
+                          className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl glass glass-hover border border-white/10 text-white/70 hover:text-white transition-all text-sm">
+                          <Video className="w-4 h-4" />
+                          Use Creator
                         </button>
                       </div>
+
+                      <p className="text-xs text-white/30 text-center">
+                        "Copy Script" generates a full scene-by-scene script with captions, hashtags & platform settings
+                      </p>
                     </div>
                   )}
                 </div>
@@ -463,6 +630,15 @@ Make titles punchy and highly clickable. Hooks must grab instantly. Be creative 
           </div>
         )}
       </div>
+
+      {/* Script Modal */}
+      {scriptModal && (
+        <ScriptModal
+          title={scriptModal.title}
+          script={scriptModal.script}
+          onClose={() => setScriptModal(null)}
+        />
+      )}
     </div>
   );
 }
