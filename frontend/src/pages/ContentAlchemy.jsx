@@ -57,6 +57,43 @@ const EMOTION_EMOJI = {
   humor: '😂', nostalgia: '🥹', FOMO: '😰',
 };
 
+const DURATIONS = [
+  { id: '5s',   label: '5s',   scenes: 0, desc: 'Ultra short — hook only' },
+  { id: '15s',  label: '15s',  scenes: 1, desc: 'Instagram Story / TikTok' },
+  { id: '30s',  label: '30s',  scenes: 2, desc: 'Short Reel' },
+  { id: '60s',  label: '60s',  scenes: 3, desc: 'Standard Reel' },
+  { id: '3min', label: '3 min', scenes: 6, desc: 'YouTube Short-long' },
+  { id: '10min', label: '10 min', scenes: 10, desc: 'YouTube Long-form' },
+];
+
+const LANGUAGES = [
+  { id: 'English',   label: 'English',   flag: '🇬🇧' },
+  { id: 'Hindi',     label: 'Hindi',     flag: '🇮🇳' },
+  { id: 'Hinglish',  label: 'Hinglish',  flag: '🔀' },
+  { id: 'Punjabi',   label: 'Punjabi',   flag: '🌾' },
+  { id: 'Tamil',     label: 'Tamil',     flag: '🎭' },
+  { id: 'Bengali',   label: 'Bengali',   flag: '🐯' },
+  { id: 'Marathi',   label: 'Marathi',   flag: '🏔️' },
+  { id: 'Telugu',    label: 'Telugu',    flag: '⭐' },
+];
+
+const HOOK_STYLES = [
+  { id: 'question',  label: '❓ Question',      prompt: 'Start with a direct question that makes the viewer feel personally called out' },
+  { id: 'bold',      label: '💥 Bold Claim',    prompt: 'Start with a shocking bold statement or controversial claim' },
+  { id: 'stat',      label: '📊 Shocking Stat', prompt: 'Start with a surprising statistic or little-known fact' },
+  { id: 'story',     label: '📖 Story',         prompt: 'Start with "I was..." or "One day..." — a personal micro-story' },
+  { id: 'contrast',  label: '⚡ Contrast',      prompt: 'Start with a sharp contrast — "Everyone thinks X... but actually Y"' },
+];
+
+const TONES = [
+  { id: 'casual',       label: '😎 Casual',       prompt: 'casual, conversational, like talking to a friend' },
+  { id: 'motivational', label: '💪 Motivational',  prompt: 'high-energy, motivational, inspirational' },
+  { id: 'educational',  label: '🎓 Educational',   prompt: 'clear, informative, teacher-style — step by step' },
+  { id: 'funny',        label: '😂 Funny',         prompt: 'humorous, witty, with jokes and relatable situations' },
+  { id: 'controversial',label: '🔥 Controversial', prompt: 'bold, provocative, designed to spark debate and comments' },
+  { id: 'storytelling', label: '🎭 Storytelling',  prompt: 'narrative-driven, emotional story arc, suspenseful' },
+];
+
 async function fetchTrending(region) {
   const subs = REGION_SUBS[region] || REGION_SUBS['India'];
   const results = [];
@@ -182,6 +219,10 @@ export default function ContentAlchemy() {
   const [expandedCard, setExpandedCard] = useState(null);
   const [scriptModal, setScriptModal] = useState(null);
   const [scriptLoadingIdx, setScriptLoadingIdx] = useState(null);
+  const [scriptDuration, setScriptDuration] = useState('60s');
+  const [scriptLanguage, setScriptLanguage] = useState('English');
+  const [hookStyle, setHookStyle] = useState('bold');
+  const [scriptTone, setScriptTone] = useState('casual');
 
   const actualNiche = niche === 'custom' ? customNiche : niche;
   const activeTrend = selectedTrend || manualTrend;
@@ -247,76 +288,84 @@ Make titles punchy and highly clickable. Hooks must grab instantly. Be creative 
   const handleCopyScript = async (r, idx) => {
     setScriptLoadingIdx(idx);
 
+    const dur = DURATIONS.find(d => d.id === scriptDuration) || DURATIONS[3];
+    const lang = LANGUAGES.find(l => l.id === scriptLanguage) || LANGUAGES[0];
+    const hook = HOOK_STYLES.find(h => h.id === hookStyle) || HOOK_STYLES[1];
+    const tone = TONES.find(t => t.id === scriptTone) || TONES[0];
+
+    const sceneCount = dur.scenes;
+    const isUltraShort = sceneCount === 0;
+
+    const sceneBlocks = isUltraShort ? '' : Array.from({ length: sceneCount }, (_, i) => {
+      const startSec = 3 + Math.floor(i * (parseInt(scriptDuration) || 60) / sceneCount);
+      const endSec = 3 + Math.floor((i + 1) * (parseInt(scriptDuration) || 60) / sceneCount);
+      return `【SCENE ${i + 1} — 0:${String(startSec).padStart(2,'0')} to 0:${String(endSec).padStart(2,'0')}】
+SPEAK: "[narration in ${lang.id} — ${tone.prompt}]"
+TEXT ON SCREEN: "[key point — 5 words max]"
+VISUAL: [describe b-roll or stock footage]`;
+    }).join('\n\n');
+
     const prompt = `You are a professional video scriptwriter. Write a complete, production-ready video script.
 
 TITLE: ${r.title}
 PLATFORM: ${r.bestPlatform}
-FORMAT: ${r.contentFormat}
-OPENING HOOK: ${r.hook}
+TOTAL DURATION: ${scriptDuration}
+LANGUAGE: Write ALL spoken parts (SPEAK lines) in ${lang.id}. Captions and hashtags also in ${lang.id}.
+HOOK STYLE: ${hook.prompt}
+TONE: ${tone.prompt}
 NICHE: ${actualNiche}
 TRENDING TOPIC: ${activeTrend}
-TONE/EMOTION: ${r.emotion}
+${isUltraShort ? 'NOTE: This is a 5-second ultra-short video — write HOOK ONLY, no scenes.' : `NOTE: Write exactly ${sceneCount} scene(s) plus hook and CTA.`}
 
-Write the COMPLETE script in this EXACT format — the creator will paste this directly into HeyGen, CapCut, InVideo, or any AI video maker:
+Fill in the script below — keep the exact format with ═══ dividers:
 
 ═══════════════════════════════════════
 📋 VIDEO SCRIPT — PASTE READY
 ═══════════════════════════════════════
 🎬 TITLE: ${r.title}
 📱 PLATFORM: ${r.bestPlatform}
-⏱ DURATION: ${r.contentFormat}
-🎭 TONE: ${r.emotion}
+⏱ DURATION: ${scriptDuration}
+🗣 LANGUAGE: ${lang.id}
+🎭 TONE: ${tone.label}
+🪝 HOOK STYLE: ${hook.label}
 ═══════════════════════════════════════
 
 【HOOK — 0:00 to 0:03】
-SPEAK: "[exact words — make it a pattern interrupt, very punchy]"
-TEXT ON SCREEN: "[bold 3-5 word overlay]"
+SPEAK: "${hook.prompt} — write the exact opening words in ${lang.id}"
+TEXT ON SCREEN: "[bold 3-5 word overlay in ${lang.id}]"
 VISUAL: [describe exactly what to show on screen]
+${isUltraShort ? '' : `
+${sceneBlocks}
 
-【SCENE 1 — 0:03 to 0:15】
-SPEAK: "[narration — exact conversational words]"
-TEXT ON SCREEN: "[key point in 5 words or less]"
-VISUAL: [b-roll / stock footage description]
-
-【SCENE 2 — 0:15 to 0:30】
-SPEAK: "[narration]"
-TEXT ON SCREEN: "[key point]"
-VISUAL: [visual suggestion]
-
-【SCENE 3 — 0:30 to 0:50】
-SPEAK: "[narration]"
-TEXT ON SCREEN: "[key point]"
-VISUAL: [visual suggestion]
-
-【CALL TO ACTION — 0:50 to end】
-SPEAK: "[compelling CTA — urgent, clear]"
+【CALL TO ACTION — final 3 seconds】
+SPEAK: "[compelling CTA in ${lang.id} — urgent, clear, tells viewer exactly what to do]"
 TEXT ON SCREEN: "[CTA text]"
-VISUAL: [visual suggestion]
+VISUAL: [visual suggestion]`}
 
 ═══════════════════════════════════════
-📝 CAPTION (copy-paste ready)
+📝 CAPTION (${lang.id} — copy-paste ready)
 ═══════════════════════════════════════
-[Write 2-3 sentence engaging caption with emojis, optimized for ${r.bestPlatform}]
+[Write 2-3 sentence engaging caption with emojis in ${lang.id}, optimized for ${r.bestPlatform}]
 
-#️⃣ HASHTAGS
-[Write 15 relevant hashtags separated by spaces]
+#️⃣ HASHTAGS (in ${lang.id} + English mix)
+[Write 15 relevant hashtags]
 
 ═══════════════════════════════════════
 ⚙️ SETTINGS FOR ${r.bestPlatform}
 ═══════════════════════════════════════
-• Aspect Ratio: [e.g. 9:16 for Reels]
-• Ideal Duration: [specific seconds]
+• Aspect Ratio: [e.g. 9:16]
+• Ideal Duration: ${scriptDuration}
 • Best Post Time: [day + time in IST]
-• Music Vibe: [describe audio style]
-• Thumbnail/Cover Text: [suggested text overlay for cover frame]
-• First Comment (pin this): [write a comment that boosts engagement]
-• Hook Style: [e.g. text appears 0.5s in, zoom transition]
+• Music Vibe: [describe audio style matching ${tone.label} tone]
+• Thumbnail/Cover Text: [3-5 words in ${lang.id}]
+• First Comment (pin this): [write in ${lang.id} — boosts engagement]
+• Editing Tip: [one specific tip for ${r.bestPlatform} in ${scriptDuration} format]
 ═══════════════════════════════════════
 
-Write SPEAK lines as natural conversational speech. Make every word count.`;
+Make SPEAK lines feel natural when spoken aloud in ${lang.id}. Every word counts.`;
 
     try {
-      const script = await callAI(prompt, 'Write the complete video script.', 2000);
+      const script = await callAI(prompt, 'Write the complete video script.', 2400);
       setScriptModal({ title: r.title, script });
     } catch {
       setError('Could not generate script. Check your API key.');
@@ -587,8 +636,83 @@ Write SPEAK lines as natural conversational speech. Make every word count.`;
                         </div>
                       </div>
 
+                      {/* Script Options */}
+                      <div className="bg-black/30 rounded-xl p-3 border border-white/5 space-y-3">
+                        <div className="text-xs text-white/40 font-mono">⚙️ SCRIPT OPTIONS</div>
+
+                        {/* Duration */}
+                        <div>
+                          <div className="text-xs text-white/30 mb-1.5">Duration</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {DURATIONS.map(d => (
+                              <button key={d.id} onClick={() => setScriptDuration(d.id)}
+                                title={d.desc}
+                                className={`py-1 px-2.5 rounded-lg text-xs font-medium transition-all ${
+                                  scriptDuration === d.id
+                                    ? 'bg-amber-500/30 border border-amber-500/50 text-amber-300'
+                                    : 'glass glass-hover text-white/50 border border-transparent'
+                                }`}>
+                                {d.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Language */}
+                        <div>
+                          <div className="text-xs text-white/30 mb-1.5">Language</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {LANGUAGES.map(l => (
+                              <button key={l.id} onClick={() => setScriptLanguage(l.id)}
+                                className={`py-1 px-2.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1 ${
+                                  scriptLanguage === l.id
+                                    ? 'bg-cyan-500/30 border border-cyan-500/50 text-cyan-300'
+                                    : 'glass glass-hover text-white/50 border border-transparent'
+                                }`}>
+                                <span>{l.flag}</span>
+                                <span>{l.label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Hook Style */}
+                        <div>
+                          <div className="text-xs text-white/30 mb-1.5">Hook Style</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {HOOK_STYLES.map(h => (
+                              <button key={h.id} onClick={() => setHookStyle(h.id)}
+                                className={`py-1 px-2.5 rounded-lg text-xs font-medium transition-all ${
+                                  hookStyle === h.id
+                                    ? 'bg-purple-500/30 border border-purple-500/50 text-purple-300'
+                                    : 'glass glass-hover text-white/50 border border-transparent'
+                                }`}>
+                                {h.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Tone */}
+                        <div>
+                          <div className="text-xs text-white/30 mb-1.5">Tone</div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {TONES.map(t => (
+                              <button key={t.id} onClick={() => setScriptTone(t.id)}
+                                className={`py-1 px-2.5 rounded-lg text-xs font-medium transition-all ${
+                                  scriptTone === t.id
+                                    ? 'bg-rose-500/30 border border-rose-500/50 text-rose-300'
+                                    : 'glass glass-hover text-white/50 border border-transparent'
+                                }`}>
+                                {t.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
                       {/* Action buttons */}
-                      <div className="grid grid-cols-2 gap-2 pt-1">
+                      <div className="grid grid-cols-2 gap-2">
                         <button
                           onClick={() => handleCopyScript(r, i)}
                           disabled={scriptLoadingIdx === i}
@@ -604,10 +728,6 @@ Write SPEAK lines as natural conversational speech. Make every word count.`;
                           Use Creator
                         </button>
                       </div>
-
-                      <p className="text-xs text-white/30 text-center">
-                        "Copy Script" generates a full scene-by-scene script with captions, hashtags & platform settings
-                      </p>
                     </div>
                   )}
                 </div>
