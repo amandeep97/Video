@@ -5,6 +5,7 @@ import AlgorithmCracker from './pages/AlgorithmCracker.jsx';
 import TrendIntelligence from './pages/TrendIntelligence.jsx';
 import VideoEditor from './pages/VideoEditor.jsx';
 import ContentAlchemy from './pages/ContentAlchemy.jsx';
+import ScriptLab from './pages/ScriptLab.jsx';
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
       <Route path="/trends" element={<TrendIntelligence />} />
       <Route path="/editor" element={<VideoEditor />} />
       <Route path="/alchemy" element={<ContentAlchemy />} />
+      <Route path="/scriptlab" element={<ScriptLab />} />
     </Routes>
   );
 }
