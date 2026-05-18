@@ -19,44 +19,51 @@ const UPCOMING_EVENTS = [
 ];
 
 const CONFESSION_SUBS = {
-  'Personal Finance': ['personalfinanceindia', 'IndiaInvestments', 'india'],
-  'Fitness & Health': ['india', 'fitness'],
-  'Technology': ['india', 'indiantech', 'startups'],
-  'Business': ['india', 'startups', 'entrepreneur'],
-  'Relationships': ['india', 'relationship_advice'],
-  'Food & Cooking': ['india', 'IndianStreetFood'],
-  'Travel': ['india', 'travel'],
-  'Education': ['india', 'developersIndia'],
+  'Personal Finance': ['personalfinanceindia', 'IndiaInvestments', 'india', 'povertyfinance'],
+  'Fitness & Health': ['india', 'loseit', 'progresspics', 'fitness'],
+  'Technology': ['india', 'indiantech', 'startups', 'cscareerquestions'],
+  'Business': ['india', 'startups', 'entrepreneur', 'smallbusiness'],
+  'Relationships': ['india', 'relationship_advice', 'AITA'],
+  'Food & Cooking': ['india', 'IndianFood', 'EatCheapAndHealthy'],
+  'Travel': ['india', 'solotravel', 'travel'],
+  'Education': ['india', 'developersIndia', 'learnprogramming'],
 };
 
 async function fetchRedditStories(niche) {
   const subs = CONFESSION_SUBS[niche] || ['india'];
-  const results = [];
-  for (const sub of subs.slice(0, 2)) {
+  const storyPosts = [];
+  const allPosts = [];
+
+  for (const sub of subs.slice(0, 3)) {
     try {
-      const res = await fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=25`, {
+      const res = await fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=30&raw_json=1`, {
         headers: { Accept: 'application/json' },
       });
       if (!res.ok) continue;
       const data = await res.json();
       (data?.data?.children || []).forEach(p => {
-        const title = p.data?.title || '';
+        const title = (p.data?.title || '').trim();
+        if (title.length < 15) return;
         const lower = title.toLowerCase();
-        const isStory =
-          lower.includes(' i ') || lower.startsWith('i ') ||
-          lower.includes("i'm") || lower.includes('i was') ||
-          lower.includes('my ') || lower.includes('how i') ||
-          lower.includes('lost ') || lower.includes('saved ') ||
-          lower.includes('failed') || lower.includes('earned') ||
-          lower.includes('story') || lower.includes('confession');
-        if (isStory && title.length > 20) {
-          results.push({ title, sub: `r/${sub}`, url: `https://reddit.com${p.data?.permalink || ''}` });
-        }
+        const isPersonal =
+          /\bi\b/.test(lower) || lower.startsWith('i ') ||
+          lower.includes("i'm") || lower.includes('i was') || lower.includes('i have') ||
+          lower.includes('my ') || lower.includes('how i') || lower.includes('me ') ||
+          lower.includes('lost ') || lower.includes('saved ') || lower.includes('earned') ||
+          lower.includes('failed') || lower.includes('story') || lower.includes('help') ||
+          lower.includes('advice') || lower.includes('experience') || lower.includes('confession') ||
+          lower.includes('should i') || lower.includes('am i') || lower.includes('anyone else');
+        const post = { title, sub: `r/${sub}` };
+        if (isPersonal) storyPosts.push(post);
+        else allPosts.push(post);
       });
     } catch {}
-    if (results.length >= 8) break;
+    if (storyPosts.length >= 8) break;
   }
-  return results.slice(0, 8);
+
+  // Prefer story posts, fallback to all posts if not enough
+  const combined = [...storyPosts, ...allPosts];
+  return combined.slice(0, 10);
 }
 
 // ── Shared copy button ───────────────────────────────────────────────────────
@@ -229,23 +236,32 @@ TEXT ON SCREEN: "[CTA overlay]"
 
         {videoMeta && (
           <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3">
-            <div className="text-xs text-green-400 mb-0.5">✓ Video found</div>
+            <div className="text-xs text-green-400 mb-0.5">✓ Video found — AI will extract its viral structure</div>
             <p className="font-medium text-sm text-white">{videoMeta.title}</p>
             <p className="text-xs text-white/40">{videoMeta.author}</p>
           </div>
         )}
 
-        <div>
-          <label className="text-xs text-white/40 mb-2 block">
-            {metaError ? `⚠️ ${metaError}` : 'Or paste title manually (Instagram / TikTok / any platform):'}
-          </label>
-          <input value={manualTitle} onChange={e => setManualTitle(e.target.value)}
-            placeholder="e.g. I invested ₹500/month for 3 years — here's what happened"
-            className="input-field text-sm" />
-        </div>
+        {!videoMeta && (
+          <div>
+            <label className="text-xs text-white/40 mb-2 block">
+              {metaError ? `⚠️ ${metaError}` : 'Or paste the video title manually (Instagram / TikTok / any platform):'}
+            </label>
+            <input value={manualTitle} onChange={e => setManualTitle(e.target.value)}
+              placeholder="e.g. I invested ₹500/month for 3 years — here's what happened"
+              className="input-field text-sm" />
+          </div>
+        )}
 
-        <div>
-          <label className="text-xs text-white/40 mb-2 block">Your topic (we'll write this using the same viral structure)</label>
+        <div className={videoMeta ? 'bg-brand-500/10 border border-brand-500/30 rounded-xl p-3' : ''}>
+          {videoMeta && (
+            <div className="text-xs text-brand-400 mb-2">
+              ↓ Now enter YOUR topic — we'll write it using the same viral blueprint
+            </div>
+          )}
+          <label className="text-xs text-white/40 mb-2 block">
+            {videoMeta ? 'Your topic:' : 'Your topic (we\'ll write this using the same viral structure)'}
+          </label>
           <input value={userTopic} onChange={e => setUserTopic(e.target.value)}
             placeholder="e.g. How I paid off my debt in 8 months"
             className="input-field text-sm" />
@@ -438,11 +454,13 @@ Return ONLY valid JSON array:
 function ConfessionEngine({ niche, setNiche }) {
   const [confessions, setConfessions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [fetchDone, setFetchDone] = useState(false);
   const [selected, setSelected] = useState('');
   const [topic, setTopic] = useState('');
   const [script, setScript] = useState('');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+  const [manualStory, setManualStory] = useState('');
 
   const niches = Object.keys(CONFESSION_SUBS);
 
@@ -451,21 +469,24 @@ function ConfessionEngine({ niche, setNiche }) {
     setConfessions([]);
     setSelected('');
     setScript('');
+    setFetchDone(false);
     const results = await fetchRedditStories(niche);
     setConfessions(results);
+    setFetchDone(true);
     setLoading(false);
   };
 
   const generate = async () => {
-    if (!selected) return;
+    const storyText = selected || manualStory.trim();
+    if (!storyText) return;
     setGenerating(true);
     setScript('');
     setError('');
 
     const prompt = `You are a viral video scriptwriter who builds scripts around real human stories.
 
-REAL POST FOUND ON REDDIT:
-"${selected}"
+REAL STORY:
+"${storyText}"
 
 MY NICHE: ${niche}
 MY CONTENT ANGLE: ${topic || niche}
@@ -545,7 +566,7 @@ TEXT ON SCREEN: [CTA text]
         <div className="card space-y-2">
           <div className="text-xs text-white/40 font-mono mb-1">🔍 REAL POSTS — tap one to build your script</div>
           {confessions.map((c, i) => (
-            <button key={i} onClick={() => setSelected(c.title)}
+            <button key={i} onClick={() => { setSelected(c.title); setManualStory(''); }}
               className={`w-full text-left p-3 rounded-xl border transition-all ${
                 selected === c.title
                   ? 'border-cyan-500/50 bg-cyan-500/10'
@@ -558,11 +579,31 @@ TEXT ON SCREEN: [CTA text]
         </div>
       )}
 
-      {selected && (
+      {fetchDone && confessions.length === 0 && (
+        <div className="card text-center py-6">
+          <div className="text-2xl mb-2">🔌</div>
+          <p className="text-white/50 text-sm mb-1">Reddit blocked this request</p>
+          <p className="text-white/30 text-xs">Paste a real story manually below — from Reddit, news, or something you heard</p>
+        </div>
+      )}
+
+      {(fetchDone || confessions.length > 0) && (
+        <div className="card space-y-3">
+          <div className="text-xs text-white/40 mb-1">Or paste any real story you found (Reddit, news, something someone told you):</div>
+          <textarea
+            value={manualStory}
+            onChange={e => { setManualStory(e.target.value); setSelected(''); }}
+            placeholder="e.g. Someone posted: 'I earned ₹80,000/month but had zero savings at 30. Here's what I was doing wrong...'"
+            className="input-field text-sm resize-none h-20"
+          />
+        </div>
+      )}
+
+      {(selected || manualStory.trim()) && (
         <div className="card space-y-3">
           <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-xl p-3">
-            <div className="text-xs text-cyan-400 mb-1">Selected real story</div>
-            <p className="text-sm text-white">{selected}</p>
+            <div className="text-xs text-cyan-400 mb-1">Building script around this story</div>
+            <p className="text-sm text-white">{selected || manualStory}</p>
           </div>
           <div>
             <label className="text-xs text-white/40 mb-2 block">Your content angle (optional)</label>
