@@ -34,36 +34,55 @@ async function fetchRedditStories(niche) {
   const storyPosts = [];
   const allPosts = [];
 
+  // Try Reddit without custom headers (reduces CORS preflight issues)
   for (const sub of subs.slice(0, 3)) {
-    try {
-      const res = await fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=30&raw_json=1`, {
-        headers: { Accept: 'application/json' },
-      });
-      if (!res.ok) continue;
-      const data = await res.json();
-      (data?.data?.children || []).forEach(p => {
-        const title = (p.data?.title || '').trim();
-        if (title.length < 15) return;
-        const lower = title.toLowerCase();
-        const isPersonal =
-          /\bi\b/.test(lower) || lower.startsWith('i ') ||
-          lower.includes("i'm") || lower.includes('i was') || lower.includes('i have') ||
-          lower.includes('my ') || lower.includes('how i') || lower.includes('me ') ||
-          lower.includes('lost ') || lower.includes('saved ') || lower.includes('earned') ||
-          lower.includes('failed') || lower.includes('story') || lower.includes('help') ||
-          lower.includes('advice') || lower.includes('experience') || lower.includes('confession') ||
-          lower.includes('should i') || lower.includes('am i') || lower.includes('anyone else');
-        const post = { title, sub: `r/${sub}` };
-        if (isPersonal) storyPosts.push(post);
-        else allPosts.push(post);
-      });
-    } catch {}
+    for (const url of [
+      `https://www.reddit.com/r/${sub}/hot.json?limit=30`,
+      `https://old.reddit.com/r/${sub}/hot.json?limit=30`,
+    ]) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) continue;
+        const data = await res.json();
+        const posts = data?.data?.children || [];
+        if (posts.length === 0) continue;
+        posts.forEach(p => {
+          const title = (p.data?.title || '').trim();
+          if (title.length < 15) return;
+          const lower = title.toLowerCase();
+          const isPersonal =
+            /\bi\b/.test(lower) || lower.startsWith('i ') ||
+            lower.includes("i'm") || lower.includes('i was') ||
+            lower.includes('my ') || lower.includes('how i') ||
+            lower.includes('lost ') || lower.includes('saved ') ||
+            lower.includes('failed') || lower.includes('story') ||
+            lower.includes('advice') || lower.includes('should i') ||
+            lower.includes('anyone else') || lower.includes('experience');
+          if (isPersonal) storyPosts.push({ title, sub: `r/${sub}` });
+          else allPosts.push({ title, sub: `r/${sub}` });
+        });
+        break; // this URL worked, skip the next one for this sub
+      } catch {}
+    }
     if (storyPosts.length >= 8) break;
   }
 
-  // Prefer story posts, fallback to all posts if not enough
-  const combined = [...storyPosts, ...allPosts];
-  return combined.slice(0, 10);
+  // Fallback: Google News for real stories (always works via rss2json)
+  if (storyPosts.length + allPosts.length < 4) {
+    try {
+      const q = encodeURIComponent(`${niche} personal story experience India`);
+      const rssUrl = encodeURIComponent(`https://news.google.com/rss/search?q=${q}&hl=en-IN&gl=IN`);
+      const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${rssUrl}`);
+      const data = await res.json();
+      (data.items || []).slice(0, 8).forEach(item => {
+        if (item.title && item.title.length > 15) {
+          allPosts.push({ title: item.title, sub: 'Google News' });
+        }
+      });
+    } catch {}
+  }
+
+  return [...storyPosts, ...allPosts].slice(0, 10);
 }
 
 // ── Shared copy button ───────────────────────────────────────────────────────
@@ -109,10 +128,19 @@ function ScriptBlock({ label, color, script }) {
 
 // ── Tab 1: Viral DNA Cloner ──────────────────────────────────────────────────
 
+const DNA_DURATIONS = [
+  { id: '15s',  label: '15s',   scenes: 1, note: 'Story / TikTok' },
+  { id: '30s',  label: '30s',   scenes: 2, note: 'Short Reel' },
+  { id: '60s',  label: '60s',   scenes: 3, note: 'Standard Reel' },
+  { id: '3min', label: '3 min', scenes: 6, note: 'YouTube Short-long' },
+  { id: '10min',label: '10 min',scenes: 10,note: 'YouTube Long-form' },
+];
+
 function DNACloner() {
   const [videoUrl, setVideoUrl] = useState('');
   const [manualTitle, setManualTitle] = useState('');
   const [userTopic, setUserTopic] = useState('');
+  const [duration, setDuration] = useState('60s');
   const [videoMeta, setVideoMeta] = useState(null);
   const [fetchingMeta, setFetchingMeta] = useState(false);
   const [metaError, setMetaError] = useState('');
@@ -144,10 +172,27 @@ function DNACloner() {
     setScript('');
     setError('');
 
+    const dur = DNA_DURATIONS.find(d => d.id === duration) || DNA_DURATIONS[2];
+    const totalSecs = duration === '3min' ? 180 : duration === '10min' ? 600 : parseInt(duration);
+    const sceneLines = dur.scenes <= 1
+      ? `【SCENE — 0:03 to ${totalSecs - 5}s】
+SPEAK: "[main content using same delivery technique]"
+TEXT ON SCREEN: "[key point]"
+VISUAL: [b-roll suggestion]`
+      : Array.from({ length: dur.scenes }, (_, i) => {
+          const start = Math.round(3 + i * (totalSecs - 8) / dur.scenes);
+          const end = Math.round(3 + (i + 1) * (totalSecs - 8) / dur.scenes);
+          return `【SCENE ${i + 1} — ${start}s to ${end}s】
+SPEAK: "[narration — same style as original]"
+TEXT ON SCREEN: "[key point]"
+VISUAL: [visual suggestion]`;
+        }).join('\n\n');
+
     const prompt = `You are a viral content analyst and scriptwriter.
 
 VIRAL VIDEO TITLE: "${title}"
 ${videoMeta?.author ? `CHANNEL: ${videoMeta.author}` : ''}
+TARGET DURATION: ${duration} total
 
 STEP 1 — Extract the psychological DNA of this video. Based on the title, infer:
 - What hook type / technique grabs attention in the first 3 seconds
@@ -155,7 +200,7 @@ STEP 1 — Extract the psychological DNA of this video. Based on the title, infe
 - What structural beats make people keep watching
 - Why people share or comment
 
-STEP 2 — Write a brand new script for MY TOPIC using the EXACT same structural DNA.
+STEP 2 — Write a brand new ${duration} script for MY TOPIC using the EXACT same structural DNA. Include exactly ${dur.scenes} scene(s) plus hook and CTA.
 
 MY TOPIC: ${userTopic}
 
@@ -165,40 +210,24 @@ Output EXACTLY in this format:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Hook Type: [type]
 0–3s: [psychological technique]
-3–15s: [what happens + why it works]
-15–35s: [what happens + why it works]
-35–50s: [what happens + why it works]
-50–60s: [CTA technique]
 Why people share: [core psychological driver]
 Emotional arc: [emotion → emotion → emotion]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📋 YOUR SCRIPT — SAME DNA
+📋 YOUR ${duration} SCRIPT — SAME DNA
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎬 TITLE: [title using the same hook pattern]
+⏱ DURATION: ${duration}
 
 【HOOK — 0:00 to 0:03】
 SPEAK: "[exact opening words — uses same hook type as original]"
 TEXT ON SCREEN: "[3–5 word bold overlay]"
 VISUAL: [describe what to show]
 
-【BUILD — 0:03 to 0:15】
-SPEAK: "[narration — same narrative technique as original]"
-TEXT ON SCREEN: "[key point]"
-VISUAL: [b-roll suggestion]
+${sceneLines}
 
-【CORE — 0:15 to 0:40】
-SPEAK: "[main content — same delivery style as original]"
-TEXT ON SCREEN: "[key points]"
-VISUAL: [visual suggestion]
-
-【PEAK — 0:40 to 0:52】
-SPEAK: "[the twist/reveal that makes people share — same as original's peak moment]"
-TEXT ON SCREEN: "[the money line]"
-VISUAL: [visual suggestion]
-
-【CTA — 0:52 to end】
-SPEAK: "[CTA using same urgency technique]"
+【CTA — last 5 seconds】
+SPEAK: "[CTA using same urgency technique as original]"
 TEXT ON SCREEN: "[CTA overlay]"
 
 ━━━ CAPTION ━━━
@@ -267,11 +296,30 @@ TEXT ON SCREEN: "[CTA overlay]"
             className="input-field text-sm" />
         </div>
 
+        {/* Duration picker */}
+        <div>
+          <label className="text-xs text-white/40 mb-2 block">Script Duration</label>
+          <div className="flex flex-wrap gap-2">
+            {DNA_DURATIONS.map(d => (
+              <button key={d.id} onClick={() => setDuration(d.id)}
+                title={d.note}
+                className={`py-1.5 px-3 rounded-lg text-xs font-medium transition-all ${
+                  duration === d.id
+                    ? 'bg-purple-500/30 border border-purple-500/50 text-purple-300'
+                    : 'glass glass-hover text-white/50 border border-transparent'
+                }`}>
+                {d.label}
+                <span className="text-white/30 ml-1 hidden sm:inline">· {d.note}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <button onClick={generate} disabled={generating || !hasTitle || !userTopic}
           className="btn-primary w-full py-3 flex items-center justify-center gap-2 disabled:opacity-40">
           {generating
-            ? <><RefreshCw className="w-4 h-4 animate-spin" /> Extracting DNA & writing...</>
-            : <>🧬 Clone Viral Structure</>}
+            ? <><RefreshCw className="w-4 h-4 animate-spin" /> Extracting DNA & writing {duration}...</>
+            : <>🧬 Clone as {duration} Script</>}
         </button>
         {error && <p className="text-red-400 text-xs">{error}</p>}
       </div>
