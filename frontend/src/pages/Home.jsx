@@ -60,6 +60,11 @@ export default function Home() {
             <span className="text-xl font-bold gradient-text">VideoAI</span>
           </div>
           <div className="flex items-center gap-3">
+            <button onClick={() => navigate('/tools')}
+              className="flex items-center gap-1.5 py-2 px-4 rounded-xl border border-cyan-500/40 bg-cyan-500/10 text-cyan-300 hover:bg-cyan-500/20 transition-all text-sm font-medium">
+              <Zap className="w-4 h-4" />
+              <span className="hidden sm:inline">Growth Tools</span>
+            </button>
             <button onClick={() => navigate('/launch')}
               className="flex items-center gap-1.5 py-2 px-4 rounded-xl border border-sky-500/40 bg-sky-500/10 text-sky-300 hover:bg-sky-500/20 transition-all text-sm font-medium">
               <Rocket className="w-4 h-4" />
