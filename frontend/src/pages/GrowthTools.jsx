@@ -30,6 +30,119 @@ const SHORT_GOALS = [
   { id: 'sales', label: 'Sell / Promote', emoji: '💰' },
 ];
 
+const cleanVisual = (v = '') => {
+  const first = v.split(',')[0].trim();
+  return first.length > 55 ? first.substring(0, 55) : first;
+};
+
+function StepBlock({ number, title, color, instruction, icon, text }) {
+  const palette = {
+    blue:   'text-blue-400 border-blue-500/30 bg-blue-500/5',
+    green:  'text-green-400 border-green-500/30 bg-green-500/5',
+    yellow: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/5',
+    purple: 'text-purple-400 border-purple-500/30 bg-purple-500/5',
+  };
+  const cls = palette[color];
+  return (
+    <div className={`rounded-xl border p-4 ${cls}`}>
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">{icon}</span>
+          <span className={`text-xs font-black uppercase tracking-wider ${cls.split(' ')[0]}`}>
+            Step {number} — {title}
+          </span>
+        </div>
+        <CopyBtn text={text} />
+      </div>
+      <p className="text-xs text-white/30 mb-3">{instruction}</p>
+      <pre className="text-sm text-white/70 whitespace-pre-wrap font-mono leading-relaxed">{text}</pre>
+    </div>
+  );
+}
+
+function CapCutModal({ result, onClose }) {
+  const segs = result.segments || [];
+
+  const footageLines = [
+    `Scene 1 (0–3s)  →  search: "${cleanVisual(result.hookVisual)}"`,
+    ...segs.map((s, i) =>
+      `Scene ${i + 2} (${s.timeStart}s–${s.timeEnd}s)  →  search: "${cleanVisual(s.visual)}"`
+    ),
+  ].join('\n');
+
+  const voiceLines = [
+    result.hook,
+    ...segs.map(s => s.spoken),
+    result.loopEnding,
+  ].filter(Boolean).join('\n');
+
+  const overlayLines = [
+    `0–3s     →  "${result.hook.substring(0, 45).toUpperCase()}"  (large · centre · bold)`,
+    ...segs.filter(s => s.textOverlay).map(s =>
+      `${s.timeStart}s–${s.timeEnd}s  →  "${s.textOverlay}"`
+    ),
+    `Last 3s  →  "${result.loopEnding.substring(0, 45)}"  (centre)`,
+  ].join('\n');
+
+  const captionText = `${result.caption}\n\n${(result.hashtags || []).map(h => `#${h.replace(/^#/, '')}`).join(' ')}`;
+
+  const allSteps =
+    `══ STEP 1 — ADD FOOTAGE ══\n${footageLines}\n\n` +
+    `══ STEP 2 — AI VOICE ══\n${voiceLines}\n\n` +
+    `══ STEP 3 — TEXT OVERLAYS ══\n${overlayLines}\n\n` +
+    `══ STEP 4 — CAPTION & HASHTAGS ══\n${captionText}\n\n` +
+    `LAST STEP: Enable Auto Captions → Export 1080×1920 → Post`;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/85 flex items-start justify-center p-4 overflow-y-auto"
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-2xl my-8">
+        <div className="card border border-green-500/30">
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-white">Export for CapCut</h2>
+              <p className="text-white/40 text-sm mt-1">4 steps. Open CapCut, follow in order. Done in 20 minutes.</p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <CopyBtn text={allSteps} size="md" />
+              <button onClick={onClose}
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-all text-sm">
+                ✕
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <StepBlock
+              number="1" title="ADD FOOTAGE" color="blue" icon="🎬"
+              instruction="CapCut → New Project → search each term in the stock library → drag clip onto timeline"
+              text={footageLines}
+            />
+            <StepBlock
+              number="2" title="AI VOICE" color="green" icon="🎙️"
+              instruction="CapCut → Text → Text to Speech → paste this → pick a voice → Generate"
+              text={voiceLines}
+            />
+            <StepBlock
+              number="3" title="TEXT OVERLAYS" color="yellow" icon="💬"
+              instruction="CapCut → Text → Add Text → type each line and drag it to the matching timestamp"
+              text={overlayLines}
+            />
+            <StepBlock
+              number="4" title="CAPTION & HASHTAGS" color="purple" icon="📋"
+              instruction="Paste this into the caption field when you post the video"
+              text={captionText}
+            />
+            <div className="bg-white/5 rounded-xl p-4 text-sm text-white/50 leading-relaxed">
+              <span className="text-white font-semibold">Final step:</span> CapCut → Auto Captions (turn on) → Export → 1080 × 1920 · 30fps → Post
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CopyBtn({ text, size = 'sm' }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
@@ -292,6 +405,7 @@ function ShortsEngine() {
   const [goal, setGoal] = useState('subscribers');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showCapCut, setShowCapCut] = useState(false);
 
   const generate = async () => {
     if (!topic.trim()) return;
@@ -521,11 +635,20 @@ Critical rules:
             </div>
           </div>
 
+          <button onClick={() => setShowCapCut(true)}
+            className="w-full py-4 rounded-xl bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-500 hover:to-teal-500 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all">
+            🎬 Export for CapCut — Step-by-Step
+          </button>
+
           <button onClick={generate}
             className="w-full py-3 glass glass-hover rounded-xl text-white/50 hover:text-white text-sm flex items-center justify-center gap-2 transition-all">
             <RefreshCw className="w-4 h-4" /> Regenerate script
           </button>
         </div>
+      )}
+
+      {showCapCut && result && (
+        <CapCutModal result={result} onClose={() => setShowCapCut(false)} />
       )}
     </div>
   );
