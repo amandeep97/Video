@@ -117,7 +117,7 @@ export default function Home() {
     <div className="min-h-screen bg-dark-950 bg-grid overflow-x-hidden">
 
       {/* Nav */}
-      <nav className="fixed top-0 inset-x-0 z-40 bg-dark-950/80 backdrop-blur-xl border-b border-white/[0.07]">
+      <nav className="fixed top-0 inset-x-0 z-40 bg-dark-950/80 backdrop-blur-xl border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
 
           {/* Logo */}
@@ -188,7 +188,7 @@ export default function Home() {
           {/* ── Main Card ── */}
           <div className="max-w-3xl mx-auto mb-6
                           rounded-3xl border border-white/10
-                          bg-white/[0.04] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]
+                          bg-white/5 
                           backdrop-blur-md p-6 sm:p-8">
             <div className="space-y-5">
 
@@ -311,7 +311,7 @@ export default function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {FEATURES.map(({ icon: Icon, title, desc }) => (
               <div key={title}
-                className="card group hover:border-white/20 hover:bg-white/[0.07] transition-all duration-300">
+                className="card group hover:border-white/20 hover:bg-white/10 transition-all duration-300">
                 <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-brand-500/20 to-purple-500/20
                                 border border-brand-500/20 flex items-center justify-center mb-4
                                 group-hover:border-brand-500/40 group-hover:scale-110 transition-all duration-300">
@@ -360,7 +360,7 @@ export default function Home() {
         <div className="max-w-2xl mx-auto text-center">
           <div className="rounded-3xl border border-brand-500/20
                           bg-gradient-to-br from-brand-500/10 to-purple-500/10
-                          shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]
+                          
                           backdrop-blur-md p-10 sm:p-14">
             <div className="text-5xl mb-6">🎬</div>
             <h2 className="text-3xl sm:text-4xl font-black mb-4">Ready to create?</h2>
@@ -377,7 +377,7 @@ export default function Home() {
       </section>
 
       {/* ───── Footer ───── */}
-      <footer className="py-8 px-6 border-t border-white/[0.06]">
+      <footer className="py-8 px-6 border-t border-white/10">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center">
