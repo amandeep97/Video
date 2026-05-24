@@ -37,24 +37,34 @@
   }
 
   .btn-primary {
-    @apply bg-gradient-to-r from-brand-500 to-purple-600 hover:from-brand-400 hover:to-purple-500
-           text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200
-           shadow-lg shadow-brand-500/25 hover:shadow-brand-500/40 hover:scale-105
-           disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100;
+    @apply relative overflow-hidden
+           bg-gradient-to-r from-brand-500 to-purple-600
+           hover:from-brand-400 hover:to-purple-500
+           text-white font-semibold px-6 py-3 rounded-2xl
+           transition-all duration-200
+           shadow-lg shadow-brand-500/30
+           hover:shadow-xl hover:shadow-brand-500/40
+           hover:scale-[1.02] active:scale-[0.98]
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100;
   }
 
   .btn-secondary {
-    @apply glass glass-hover text-white font-medium px-5 py-2.5 rounded-xl transition-all duration-200;
+    @apply glass glass-hover text-white font-medium px-5 py-2.5 rounded-2xl transition-all duration-200;
   }
 
   .input-field {
-    @apply w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white
-           placeholder-white/30 focus:outline-none focus:border-brand-500/60 focus:bg-white/10
+    @apply w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 text-white
+           placeholder-white/30 focus:outline-none focus:border-brand-500/50 focus:bg-white/8
+           focus:shadow-[0_0_0_3px_rgba(79,110,247,0.15)]
            transition-all duration-200;
   }
 
   .card {
-    @apply glass rounded-2xl p-6;
+    @apply rounded-2xl p-6
+           bg-white/[0.04]
+           border border-white/10
+           shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]
+           backdrop-blur-md;
   }
 
   .gradient-text {
@@ -69,6 +79,14 @@
   .scene-card.active {
     @apply border-brand-500/60 bg-brand-500/10;
   }
+
+  .tool-card {
+    @apply flex flex-col gap-2 p-4 rounded-2xl border border-white/10
+           bg-white/[0.04] hover:bg-white/[0.08]
+           hover:border-white/20 hover:scale-[1.02]
+           active:scale-[0.97]
+           transition-all duration-200 cursor-pointer text-left;
+  }
 }
 
 @layer utilities {
@@ -78,9 +96,13 @@
 
   .bg-grid {
     background-image:
-      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-    background-size: 50px 50px;
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  .glow-brand {
+    box-shadow: 0 0 40px rgba(79, 110, 247, 0.3);
   }
 
   .animate-shimmer {
@@ -93,4 +115,37 @@
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }
   }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  .animate-slide-down {
+    animation: slideDown 0.2s ease-out forwards;
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out forwards;
+  }
+}
+
+/* btn-primary shine sweep on hover */
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.5s ease;
+}
+.btn-primary:hover::after {
+  left: 160%;
 }
