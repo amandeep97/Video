@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Wand2, Zap, ChevronRight, RefreshCw, Video, Sparkles, ArrowLeft, Star, Heart, ClipboardCopy, Check, X } from 'lucide-react';
 import { callAI } from '../services/api.js';
+import { HowTo } from '../components/HowTo.jsx';
 
 const NICHES = [
   'Personal Finance', 'Fitness & Health', 'Food & Cooking', 'Travel',
@@ -419,6 +420,14 @@ Make SPEAK lines feel natural when spoken aloud in ${lang.id}. Every word counts
         {/* ── STEP 1: Setup ── */}
         {step === 1 && (
           <div className="space-y-6">
+            <HowTo
+              when="you're stuck on what video to make and want ideas based on what's trending right now"
+              steps={[
+                'Step 1: Choose your niche, platform, and region → click Next',
+                'Step 2: AI fetches live trending topics → pick one that fits your channel',
+                'Step 3: AI generates 5 viral angles combining your niche + that trend → each has a full copy-ready script',
+              ]}
+            />
             <div className="text-center mb-8">
               <div className="text-5xl mb-4">⚗️</div>
               <h1 className="text-3xl font-black mb-2">Content Alchemy Lab</h1>

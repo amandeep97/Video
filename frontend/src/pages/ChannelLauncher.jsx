@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, ClipboardCopy, Check, ChevronRight, Search } from 'lucide-react';
 import { callAI } from '../services/api.js';
+import { HowTo } from '../components/HowTo.jsx';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -127,6 +128,14 @@ Make keywords in ${language} language mix where appropriate.`;
 
   return (
     <div className="space-y-5">
+      <HowTo
+        when="you have 0 subscribers and don't know what videos to make first"
+        steps={[
+          'Select your niche (topic your channel is about) and your region',
+          'Click Find Keywords — AI finds 12 low-competition topics people actually search for',
+          'Pick a keyword with green (Low) competition → click "Use This Keyword" to jump to the SEO tab',
+        ]}
+      />
       <div className="card space-y-4">
         {/* Niche */}
         <div>
@@ -306,6 +315,14 @@ Generate a complete SEO package. Return ONLY valid JSON:
 
   return (
     <div className="space-y-5">
+      <HowTo
+        when="you have a keyword and need to optimize your video before uploading"
+        steps={[
+          'Enter the keyword (or it auto-fills from Keyword Hunter), your channel name, and niche',
+          'Click Generate — you get 5 title options, full description, 15 tags, thumbnail idea, and best posting time',
+          'Copy each section directly into YouTube Studio when you upload your video',
+        ]}
+      />
       <div className="card space-y-4">
         {prefill?.keyword && (
           <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3">
@@ -560,6 +577,14 @@ Return ONLY valid JSON:
 
   return (
     <div className="space-y-5">
+      <HowTo
+        when="you just started your channel and don't know what to post for the first month"
+        steps={[
+          'Enter your niche, how often you can post per week, and your region',
+          'Click Generate — you get a week-by-week plan with specific video titles, keywords, and hooks',
+          'Follow it week by week — each video has a reason why it\'s ordered that way for algorithm growth',
+        ]}
+      />
       <div className="card space-y-4">
         <div>
           <label className="text-xs text-white/40 mb-2 block">Your niche</label>

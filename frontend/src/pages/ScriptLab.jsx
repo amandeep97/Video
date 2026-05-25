@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, ClipboardCopy, Check, Search } from 'lucide-react';
 import { callAI } from '../services/api.js';
+import { HowTo } from '../components/HowTo.jsx';
 
 // ── Shared data ──────────────────────────────────────────────────────────────
 
@@ -249,6 +250,14 @@ TEXT ON SCREEN: "[CTA overlay]"
 
   return (
     <div className="space-y-5">
+      <HowTo
+        when="you found a viral video and want to make something similar but with your own topic"
+        steps={[
+          'Paste the YouTube URL of a viral video in your niche',
+          'Enter YOUR topic — the thing you actually want to talk about',
+          'Pick a duration → Generate → AI extracts what made it viral and rewrites it with your topic',
+        ]}
+      />
       <div className="card space-y-4">
         <div>
           <label className="text-xs text-white/40 mb-2 block">Paste a viral YouTube URL</label>
@@ -404,6 +413,14 @@ Return ONLY valid JSON array:
 
   return (
     <div className="space-y-5">
+      <HowTo
+        when="you want to make a video that will be relevant to an upcoming event or trend"
+        steps={[
+          'Look at the calendar — events with red borders need a video posted soon',
+          'Click "Predict Content" on any event to get AI video ideas for that moment',
+          'Check the Reddit signals at the bottom to see what people are talking about right now',
+        ]}
+      />
       <div className="card">
         <div className="text-xs text-white/40 font-mono mb-3">📅 POST BEFORE THESE DATES — don't be late</div>
         <div className="space-y-2">
@@ -588,6 +605,14 @@ TEXT ON SCREEN: [CTA text]
 
   return (
     <div className="space-y-5">
+      <HowTo
+        when="you want to make a video based on real stories, struggles, or confessions from your niche"
+        steps={[
+          'Select your niche → click Fetch Stories — AI pulls real stories from Reddit and news',
+          'Pick a story that resonates OR type your own story in the text box below',
+          'Click Generate Script — AI writes a full video script using that real story as the hook',
+        ]}
+      />
       <div className="card space-y-3">
         <label className="text-xs text-white/40 block">Niche (to find relevant real stories)</label>
         <div className="flex flex-wrap gap-2">
@@ -796,6 +821,14 @@ TEXT ON SCREEN: [CTA text]
 
   return (
     <div className="space-y-5">
+      <HowTo
+        when="you feel like your content looks the same as everyone else's and nothing makes you stand out"
+        steps={[
+          'Fill in the 6 fields about yourself — be specific and honest, not generic',
+          'Click Generate — AI finds 5 video angles that ONLY you can make based on your real background',
+          'Pick the angle that excites you most → Generate Script → that\'s your most authentic video',
+        ]}
+      />
       <div className="card space-y-4">
         <p className="text-xs text-white/40 leading-relaxed">
           The more specific and real your answers, the better. Generic answers = generic angles. Real details = content nobody can copy.

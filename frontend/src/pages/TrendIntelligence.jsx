@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { callAI } from '../services/api.js';
 import { getBackendUrl } from '../services/replicate.js';
+import { HowTo } from '../components/HowTo.jsx';
 
 // ── Region config ──────────────────────────────────────────────────────────
 const REGIONS = [
@@ -306,6 +307,14 @@ Return ONLY this JSON:
       </nav>
 
       <div className="max-w-4xl mx-auto px-4 pt-16 pb-12 space-y-4">
+        <HowTo
+          when="you don't know what to make next and want to find a topic people are searching for right now"
+          steps={[
+            'Set your niche and region using the Filters button → click Refresh Trends',
+            'Browse the trending topics from Reddit and News — these are real conversations happening now',
+            'Click "Generate Video Ideas" on any trend → copy the best idea into Growth Tools to write your script',
+          ]}
+        />
 
         {/* ── Filters (collapsed by default) ──────────────────────────── */}
         {showFilters && (

@@ -271,6 +271,32 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ───── Beginner Flow ───── */}
+      <section className="py-10 px-4 sm:px-6">
+        <div className="max-w-3xl mx-auto">
+          <div className="rounded-2xl border border-brand-500/20 bg-brand-500/5 p-6">
+            <p className="text-xs font-bold text-brand-400 uppercase tracking-widest mb-4">🚀 New channel? Start here — in this order</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                { step: '1', label: 'Find your keywords', tool: 'Launch Kit', route: '/launch', desc: 'Pick topics people actually search for with low competition', color: 'text-sky-400' },
+                { step: '2', label: 'Write your script', tool: 'Growth Tools', route: '/tools', desc: 'Generate a hook + full Shorts script for your first video', color: 'text-cyan-400' },
+                { step: '3', label: 'Make the video', tool: 'Export to CapCut', route: '/tools', desc: 'Get a 4-step CapCut guide — footage, voice, overlays, done', color: 'text-green-400' },
+              ].map(s => (
+                <button key={s.step} onClick={() => navigate(s.route)}
+                  className="text-left p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-5 h-5 rounded-full bg-white/10 text-white/50 text-xs font-bold flex items-center justify-center">{s.step}</span>
+                    <span className={`text-xs font-bold ${s.color}`}>{s.tool}</span>
+                  </div>
+                  <p className="text-sm font-semibold text-white mb-1">{s.label}</p>
+                  <p className="text-xs text-white/40 leading-snug">{s.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ───── Tool Cards Strip ───── */}
       <section className="py-10 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">

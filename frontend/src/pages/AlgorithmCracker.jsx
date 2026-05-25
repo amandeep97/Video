@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { callAI } from '../services/api.js';
 import { getBackendUrl } from '../services/replicate.js';
+import { HowTo } from '../components/HowTo.jsx';
 
 const PLATFORMS = [
   { id: 'all',            label: 'All Platforms',  emoji: '🌐' },
@@ -316,6 +317,14 @@ ${hashtagsJson}
       </nav>
 
       <div className="max-w-4xl mx-auto px-4 pt-20 pb-12">
+        <HowTo
+          when="you're posting but getting very few views and don't know why"
+          steps={[
+            'Describe your topic or paste your video title in the text box',
+            'Select your platform (YouTube, TikTok, Reels) and click Analyze',
+            'Read the platform-specific tips — focus on the top 3 and apply them to your next video',
+          ]}
+        />
 
         {/* Input card */}
         <div className="card mb-6">

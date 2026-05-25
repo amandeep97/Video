@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Zap, ChevronLeft, Copy, Check, RefreshCw, Play, Sparkles } from 'lucide-react';
 import { callAI } from '../services/api.js';
 import { hasValidKey } from '../services/providers.js';
+import { HowTo } from '../components/HowTo.jsx';
 
 const PLATFORMS = [
   { id: 'youtube', label: 'YouTube', emoji: '▶️' },
@@ -290,10 +291,18 @@ Be specific and punchy. No filler lines.`,
 
   return (
     <div className="space-y-6">
+      <HowTo
+        when="you're about to film a video and don't know how to start it"
+        steps={[
+          'Enter your video topic, who it\'s for, and your niche',
+          'Click Generate — you get 5 hook styles (curiosity, result, fear, story, controversy)',
+          'Pick the one that feels right → click "Build 30s intro" → copy it into CapCut or your notes',
+        ]}
+      />
       <div className="card space-y-4">
         <div>
           <h2 className="text-lg font-bold text-white">Hook Writer</h2>
-          <p className="text-white/40 text-sm mt-1">The first 3 seconds decide your watch time. Generate 5 proven hook styles — then build the full 30s intro from any one.</p>
+          <p className="text-white/40 text-sm mt-1">The first 3 seconds decide your watch time.</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -486,10 +495,18 @@ Critical rules:
 
   return (
     <div className="space-y-6">
+      <HowTo
+        when="you want to make a YouTube Short, TikTok, or Instagram Reel"
+        steps={[
+          'Enter your topic, pick platform (Shorts / TikTok / Reels), duration, and your goal',
+          'Click Generate — you get a full script with exact timing, visuals, text overlays, and a loop ending',
+          'Click the green "Export for CapCut" button → follow the 4 steps inside → done in 20 minutes',
+        ]}
+      />
       <div className="card space-y-4">
         <div>
           <h2 className="text-lg font-bold text-white">Shorts Engine</h2>
-          <p className="text-white/40 text-sm mt-1">Frame-by-frame short-form scripts with loop endings. Built for the algorithm — rewatches are the signal.</p>
+          <p className="text-white/40 text-sm mt-1">Frame-by-frame scripts with loop endings. Built for the algorithm.</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
