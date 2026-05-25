@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, ClipboardCopy, Check, Search } from 'lucide-react';
+import { ArrowLeft, RefreshCw, ClipboardCopy, Check, Search, Trash2 } from 'lucide-react';
 import { callAI } from '../services/api.js';
 import { HowTo } from '../components/HowTo.jsx';
+import { useLocalStorage } from '../hooks/useLocalStorage.js';
 
 // ── Shared data ──────────────────────────────────────────────────────────────
 
@@ -138,16 +139,17 @@ const DNA_DURATIONS = [
 ];
 
 function DNACloner() {
-  const [videoUrl, setVideoUrl] = useState('');
-  const [manualTitle, setManualTitle] = useState('');
-  const [userTopic, setUserTopic] = useState('');
-  const [duration, setDuration] = useState('60s');
-  const [videoMeta, setVideoMeta] = useState(null);
+  const [videoUrl, setVideoUrl] = useLocalStorage('dna_url', '');
+  const [manualTitle, setManualTitle] = useLocalStorage('dna_manualTitle', '');
+  const [userTopic, setUserTopic] = useLocalStorage('dna_topic', '');
+  const [duration, setDuration] = useLocalStorage('dna_duration', '60s');
+  const [videoMeta, setVideoMeta] = useLocalStorage('dna_meta', null);
   const [fetchingMeta, setFetchingMeta] = useState(false);
   const [metaError, setMetaError] = useState('');
-  const [script, setScript] = useState('');
+  const [script, setScript] = useLocalStorage('dna_script', '');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+  const clearAll = () => { setVideoUrl(''); setManualTitle(''); setUserTopic(''); setDuration('60s'); setVideoMeta(null); setScript(''); };
 
   const fetchMeta = async () => {
     if (!videoUrl.trim()) return;
@@ -333,7 +335,17 @@ TEXT ON SCREEN: "[CTA overlay]"
         {error && <p className="text-red-400 text-xs">{error}</p>}
       </div>
 
-      {script && <ScriptBlock label="🧬 DNA + YOUR CLONED SCRIPT" color="text-purple-400" script={script} />}
+      {script && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <p className="text-xs text-white/25">Saved — go back anytime, it'll still be here</p>
+            <button onClick={clearAll} className="flex items-center gap-1.5 text-xs text-red-400/70 hover:text-red-400 transition-colors">
+              <Trash2 className="w-3.5 h-3.5" /> Clear & start over
+            </button>
+          </div>
+          <ScriptBlock label="🧬 DNA + YOUR CLONED SCRIPT" color="text-purple-400" script={script} />
+        </div>
+      )}
     </div>
   );
 }

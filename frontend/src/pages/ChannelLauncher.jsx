@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, ClipboardCopy, Check, ChevronRight, Search } from 'lucide-react';
+import { ArrowLeft, RefreshCw, ClipboardCopy, Check, ChevronRight, Search, Trash2 } from 'lucide-react';
 import { callAI } from '../services/api.js';
 import { HowTo } from '../components/HowTo.jsx';
+import { useLocalStorage } from '../hooks/useLocalStorage.js';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -67,13 +68,14 @@ function CompBadge({ level }) {
 // ── Tab 1: Keyword Hunter ─────────────────────────────────────────────────────
 
 function KeywordHunter({ onUseKeyword }) {
-  const [niche, setNiche] = useState('');
-  const [customNiche, setCustomNiche] = useState('');
-  const [region, setRegion] = useState('All India');
-  const [language, setLanguage] = useState('Hindi');
-  const [keywords, setKeywords] = useState([]);
+  const [niche, setNiche] = useLocalStorage('kh_niche', '');
+  const [customNiche, setCustomNiche] = useLocalStorage('kh_customNiche', '');
+  const [region, setRegion] = useLocalStorage('kh_region', 'All India');
+  const [language, setLanguage] = useLocalStorage('kh_language', 'Hindi');
+  const [keywords, setKeywords] = useLocalStorage('kh_keywords', []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const clearAll = () => { setNiche(''); setCustomNiche(''); setRegion('All India'); setLanguage('Hindi'); setKeywords([]); };
 
   const actualNiche = niche === 'custom' ? customNiche : niche;
 
@@ -204,9 +206,13 @@ Make keywords in ${language} language mix where appropriate.`;
 
       {keywords.length > 0 && (
         <div className="space-y-3">
-          <div className="text-xs text-white/40 font-mono text-center">
-            🎯 {keywords.filter(k => k.competition === 'low').length} LOW COMPETITION keywords found — these you can rank for NOW
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-white/40 font-mono">🎯 {keywords.filter(k => k.competition === 'low').length} LOW COMPETITION found</div>
+            <button onClick={clearAll} className="flex items-center gap-1.5 text-xs text-red-400/70 hover:text-red-400 transition-colors">
+              <Trash2 className="w-3.5 h-3.5" /> Clear
+            </button>
           </div>
+          <p className="text-xs text-white/25 text-center">Saved — go back anytime, it'll still be here</p>
           {keywords.map((k, i) => (
             <div key={i} className={`card border ${
               k.competition === 'low' ? 'border-green-500/20' : 'border-white/10'
@@ -248,14 +254,15 @@ Make keywords in ${language} language mix where appropriate.`;
 // ── Tab 2: SEO Package ───────────────────────────────────────────────────────
 
 function SEOPackage({ prefill }) {
-  const [keyword, setKeyword] = useState(prefill?.keyword || '');
-  const [channelName, setChannelName] = useState('');
-  const [niche, setNiche] = useState(prefill?.niche || '');
-  const [language, setLanguage] = useState('Hindi');
-  const [city, setCity] = useState('');
-  const [pkg, setPkg] = useState(null);
+  const [keyword, setKeyword] = useLocalStorage('seo_keyword', prefill?.keyword || '');
+  const [channelName, setChannelName] = useLocalStorage('seo_channelName', '');
+  const [niche, setNiche] = useLocalStorage('seo_niche', prefill?.niche || '');
+  const [language, setLanguage] = useLocalStorage('seo_language', 'Hindi');
+  const [city, setCity] = useLocalStorage('seo_city', '');
+  const [pkg, setPkg] = useLocalStorage('seo_pkg', null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const clearAll = () => { setKeyword(''); setChannelName(''); setNiche(''); setCity(''); setPkg(null); };
 
   // Update keyword when prefill changes
   if (prefill?.keyword && keyword !== prefill.keyword && !pkg) {
@@ -383,6 +390,12 @@ Generate a complete SEO package. Return ONLY valid JSON:
 
       {pkg && (
         <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-white/25">Saved — go back anytime, it'll still be here</p>
+            <button onClick={clearAll} className="flex items-center gap-1.5 text-xs text-red-400/70 hover:text-red-400 transition-colors">
+              <Trash2 className="w-3.5 h-3.5" /> Clear
+            </button>
+          </div>
           {/* Titles */}
           <div className="card">
             <div className="flex items-center justify-between mb-3">
@@ -495,13 +508,14 @@ Generate a complete SEO package. Return ONLY valid JSON:
 // ── Tab 3: 30-Day Launch Plan ────────────────────────────────────────────────
 
 function LaunchPlan() {
-  const [niche, setNiche] = useState('');
-  const [customNiche, setCustomNiche] = useState('');
-  const [language, setLanguage] = useState('Hindi');
-  const [region, setRegion] = useState('All India');
-  const [freq, setFreq] = useState('2 videos/week');
-  const [plan, setPlan] = useState(null);
+  const [niche, setNiche] = useLocalStorage('lp_niche', '');
+  const [customNiche, setCustomNiche] = useLocalStorage('lp_customNiche', '');
+  const [language, setLanguage] = useLocalStorage('lp_language', 'Hindi');
+  const [region, setRegion] = useLocalStorage('lp_region', 'All India');
+  const [freq, setFreq] = useLocalStorage('lp_freq', '2 videos/week');
+  const [plan, setPlan] = useLocalStorage('lp_plan', null);
   const [loading, setLoading] = useState(false);
+  const clearAll = () => { setNiche(''); setCustomNiche(''); setPlan(null); };
   const [error, setError] = useState('');
 
   const actualNiche = niche === 'custom' ? customNiche : niche;
@@ -664,6 +678,12 @@ Return ONLY valid JSON:
 
       {plan && (
         <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-white/25">Saved — go back anytime, it'll still be here</p>
+            <button onClick={clearAll} className="flex items-center gap-1.5 text-xs text-red-400/70 hover:text-red-400 transition-colors">
+              <Trash2 className="w-3.5 h-3.5" /> Clear
+            </button>
+          </div>
           {/* Strategy */}
           <div className="card bg-violet-500/5 border border-violet-500/20">
             <div className="text-xs text-violet-400 font-mono mb-2">🎯 YOUR 30-DAY STRATEGY</div>

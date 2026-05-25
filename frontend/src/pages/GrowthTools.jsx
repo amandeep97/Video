@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Zap, ChevronLeft, Copy, Check, RefreshCw, Play, Sparkles } from 'lucide-react';
+import { Zap, ChevronLeft, Copy, Check, RefreshCw, Play, Sparkles, Trash2 } from 'lucide-react';
 import { callAI } from '../services/api.js';
 import { hasValidKey } from '../services/providers.js';
 import { HowTo } from '../components/HowTo.jsx';
+import { useLocalStorage } from '../hooks/useLocalStorage.js';
 
 const PLATFORMS = [
   { id: 'youtube', label: 'YouTube', emoji: '▶️' },
@@ -161,11 +162,13 @@ function CopyBtn({ text, size = 'sm' }) {
 }
 
 function HookWriter() {
-  const [topic, setTopic] = useState('');
-  const [audience, setAudience] = useState('');
-  const [niche, setNiche] = useState('');
-  const [platform, setPlatform] = useState('youtube');
-  const [hooks, setHooks] = useState(null);
+  const [topic, setTopic] = useLocalStorage('hw_topic', '');
+  const [audience, setAudience] = useLocalStorage('hw_audience', '');
+  const [niche, setNiche] = useLocalStorage('hw_niche', '');
+  const [platform, setPlatform] = useLocalStorage('hw_platform', 'youtube');
+  const [hooks, setHooks] = useLocalStorage('hw_hooks', null);
+
+  const clearAll = () => { setTopic(''); setAudience(''); setNiche(''); setPlatform('youtube'); setHooks(null); setExpandedHook(null); setIntroScript({}); };
   const [loading, setLoading] = useState(false);
   const [expandedHook, setExpandedHook] = useState(null);
   const [introScript, setIntroScript] = useState({});
@@ -348,6 +351,12 @@ Be specific and punchy. No filler lines.`,
 
       {hooks && (
         <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-white/30">Saved — go back anytime, it'll still be here</span>
+            <button onClick={clearAll} className="flex items-center gap-1.5 text-xs text-red-400/70 hover:text-red-400 transition-colors">
+              <Trash2 className="w-3.5 h-3.5" /> Clear & start over
+            </button>
+          </div>
           {hooks.map((hook, idx) => (
             <div key={idx} className="card border border-white/10">
               <div className="flex items-start justify-between gap-4 mb-3">
@@ -407,14 +416,16 @@ Be specific and punchy. No filler lines.`,
 }
 
 function ShortsEngine() {
-  const [topic, setTopic] = useState('');
-  const [niche, setNiche] = useState('');
-  const [platform, setPlatform] = useState('shorts');
-  const [duration, setDuration] = useState('60s');
-  const [goal, setGoal] = useState('subscribers');
-  const [result, setResult] = useState(null);
+  const [topic, setTopic] = useLocalStorage('se_topic', '');
+  const [niche, setNiche] = useLocalStorage('se_niche', '');
+  const [platform, setPlatform] = useLocalStorage('se_platform', 'shorts');
+  const [duration, setDuration] = useLocalStorage('se_duration', '60s');
+  const [goal, setGoal] = useLocalStorage('se_goal', 'subscribers');
+  const [result, setResult] = useLocalStorage('se_result', null);
   const [loading, setLoading] = useState(false);
   const [showCapCut, setShowCapCut] = useState(false);
+
+  const clearAll = () => { setTopic(''); setNiche(''); setPlatform('shorts'); setDuration('60s'); setGoal('subscribers'); setResult(null); setShowCapCut(false); };
 
   const generate = async () => {
     if (!topic.trim()) return;
@@ -574,8 +585,14 @@ Critical rules:
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-white font-bold text-lg">{result.title}</h3>
-            <CopyBtn text={fullScript} size="md" />
+            <div className="flex items-center gap-2">
+              <CopyBtn text={fullScript} size="md" />
+              <button onClick={clearAll} className="flex items-center gap-1.5 text-xs text-red-400/70 hover:text-red-400 transition-colors px-2 py-1.5 rounded-lg hover:bg-red-500/10">
+                <Trash2 className="w-3.5 h-3.5" /> Clear
+              </button>
+            </div>
           </div>
+          <p className="text-xs text-white/25">Saved — go back anytime, it'll still be here</p>
 
           {/* Hook */}
           <div className="card border border-red-500/30 bg-red-500/5">
