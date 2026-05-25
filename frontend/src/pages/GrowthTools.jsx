@@ -688,9 +688,370 @@ Critical rules:
   );
 }
 
+// ─── Song Video ───────────────────────────────────────────────────────────────
+
+const MOODS = [
+  { id: 'sad',          label: 'Sad',          emoji: '💔', desc: 'Heartbreak & longing',     grad: 'from-blue-600 to-indigo-800' },
+  { id: 'motivational', label: 'Motivational', emoji: '🔥', desc: 'Hustle & rise',             grad: 'from-orange-500 to-red-600' },
+  { id: 'love',         label: 'Love',         emoji: '❤️', desc: 'Romance & feelings',        grad: 'from-pink-500 to-rose-600' },
+  { id: 'betrayal',     label: 'Betrayal',     emoji: '🥀', desc: 'Cheating & broken trust',   grad: 'from-slate-600 to-gray-800' },
+  { id: 'party',        label: 'Party',        emoji: '🎉', desc: 'Celebration & energy',      grad: 'from-yellow-500 to-orange-500' },
+  { id: 'nostalgic',    label: 'Nostalgic',    emoji: '🌅', desc: 'Memories & old times',      grad: 'from-amber-500 to-yellow-600' },
+];
+
+const SONG_LANGS = [
+  { id: 'punjabi',  label: 'Punjabi',  note: 'ਗੁਰਮੁਖੀ' },
+  { id: 'hindi',    label: 'Hindi',    note: 'हिंदी' },
+  { id: 'hinglish', label: 'Hinglish', note: 'Roman mix' },
+  { id: 'english',  label: 'English',  note: 'English' },
+];
+
+function SongCapCutModal({ result, mood, onClose }) {
+  const footageLines = (result.footage || []).map(f =>
+    `${f.timeStart}s–${f.timeEnd}s  →  search: "${f.search}"`
+  ).join('\n');
+
+  const overlayLines = (result.overlays || []).map(o =>
+    `${o.timeStart}s–${o.timeEnd}s  →  "${o.text}"  (${o.style})`
+  ).join('\n');
+
+  const captionText = `${result.caption}\n\n${(result.hashtags || []).map(h => `#${h.replace(/^#/, '')}`).join(' ')}`;
+
+  const allSteps =
+    `══ STEP 1 — ADD FOOTAGE ══\n${footageLines}\n\n` +
+    `══ STEP 2 — ADD YOUR SONG ══\nCapCut → tap + → Music → search your song OR My Music to import from phone\nDrag the song to the timeline\n\n` +
+    `══ STEP 3 — BEAT SYNC ══\nCapCut → select all clips → Auto Beat Sync → ON\nClips will cut automatically to the beat\n\n` +
+    `══ STEP 4 — TEXT OVERLAYS ══\n${overlayLines}\n\n` +
+    `══ STEP 5 — CAPTION & HASHTAGS ══\n${captionText}\n\n` +
+    `TIPS:\n${result.beatTip}\n${result.postingTip}`;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/85 flex items-start justify-center p-4 overflow-y-auto"
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-2xl my-8">
+        <div className="card border border-pink-500/30">
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-white">Export for CapCut</h2>
+              <p className="text-white/40 text-sm mt-1">5 steps. Song video done in 15 minutes.</p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <CopyBtn text={allSteps} size="md" />
+              <button onClick={onClose}
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-all text-sm">✕</button>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <StepBlock number="1" title="ADD FOOTAGE" color="blue" icon="🎬"
+              instruction="CapCut → New Project → search each term in stock library → drag clip to timeline"
+              text={footageLines} />
+
+            <StepBlock number="2" title="ADD YOUR SONG" color="green" icon="🎵"
+              instruction="CapCut → tap + at bottom → Music → My Music (import from phone) OR search song name"
+              text={`Drag the song to the audio track\nTrim it to the part you want\nSet volume to 100%`} />
+
+            <StepBlock number="3" title="BEAT SYNC" color="purple" icon="🥁"
+              instruction="CapCut → select all video clips → tap 'Auto Beat Sync' → turn ON → clips cut to the beat automatically"
+              text={result.beatTip || 'Use Auto Beat Sync for automatic cuts on every beat drop'} />
+
+            <StepBlock number="4" title="TEXT OVERLAYS" color="yellow" icon="💬"
+              instruction="CapCut → Text → Add Text → type each line and drag to the matching timestamp"
+              text={overlayLines} />
+
+            <StepBlock number="5" title="CAPTION & HASHTAGS" color="blue" icon="📋"
+              instruction="Paste this when posting your video"
+              text={captionText} />
+
+            <div className="bg-white/5 rounded-xl p-4 text-sm text-white/50 leading-relaxed">
+              <span className="text-white font-semibold">Final:</span> Export 1080×1920 · 30fps → Post to Shorts/Reels/TikTok
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SongVideo() {
+  const [mood, setMood] = useLocalStorage('sv_mood', 'sad');
+  const [language, setLanguage] = useLocalStorage('sv_lang', 'punjabi');
+  const [duration, setDuration] = useLocalStorage('sv_dur', '60s');
+  const [platform, setPlatform] = useLocalStorage('sv_platform', 'shorts');
+  const [songVibe, setSongVibe] = useLocalStorage('sv_vibe', '');
+  const [result, setResult] = useLocalStorage('sv_result', null);
+  const [loading, setLoading] = useState(false);
+  const [showCapCut, setShowCapCut] = useState(false);
+
+  const clearAll = () => { setMood('sad'); setLanguage('punjabi'); setSongVibe(''); setResult(null); setShowCapCut(false); };
+
+  const generate = async () => {
+    if (!hasValidKey()) { alert('Set your API key first.'); return; }
+    setLoading(true);
+    setResult(null);
+    const secs = duration === '15s' ? 15 : duration === '30s' ? 30 : 60;
+    const moodObj = MOODS.find(m => m.id === mood);
+    const scriptNote = language === 'punjabi'
+      ? 'Write ALL text overlays in Punjabi using Gurmukhi script (ਇਸ ਤਰ੍ਹਾਂ). Do NOT use Roman Punjabi.'
+      : language === 'hindi'
+      ? 'Write ALL text overlays in Hindi using Devanagari script (इस तरह).'
+      : language === 'hinglish'
+      ? 'Write ALL text overlays in Hinglish — Roman script mixing Hindi and English naturally (e.g. "Dil toot gaya yaar").'
+      : 'Write ALL text overlays in English.';
+    try {
+      const raw = await callAI(
+        `You are an expert at creating viral text overlay scripts for Indian song videos on YouTube Shorts, Instagram Reels, and TikTok. You understand Punjabi culture, emotions, and what makes song videos go viral.`,
+        `Create a complete text overlay script for a ${mood} mood song video:
+
+Mood: ${moodObj.label} — ${moodObj.desc}
+Language: ${language}
+Duration: ${secs} seconds
+Platform: ${platform}
+Song vibe: ${songVibe || `a ${mood} Punjabi song`}
+
+${scriptNote}
+
+Return ONLY valid JSON:
+{
+  "overlays": [
+    {
+      "timeStart": 0,
+      "timeEnd": 4,
+      "text": "text shown on screen — SHORT, max 6 words, emotionally powerful",
+      "style": "how it looks in CapCut (e.g. centre white bold, fade in bottom, glitch top)"
+    }
+  ],
+  "footage": [
+    {
+      "timeStart": 0,
+      "timeEnd": 4,
+      "search": "specific CapCut stock footage search term that matches the visual mood"
+    }
+  ],
+  "caption": "emotional caption for posting — 2-3 sentences matching the mood, in ${language}",
+  "hashtags": ["hashtag1", "hashtag2"],
+  "beatTip": "One specific tip for syncing these overlays with the song beat in CapCut",
+  "postingTip": "Best time and day to post this mood content for maximum reach on ${platform}"
+}
+
+Rules:
+- Overlays must FEEL like they match the song emotion — poetic, not informational
+- Each overlay MAX 6 words — punchy and visual
+- Footage must be specific and cinematic (not generic)
+- Total time must equal ${secs} seconds
+- Hashtags: 5 mood-specific + 5 Punjabi/Indian music + 5 platform = 15 total
+- Make the viewer FEEL the emotion just from the text overlays alone`,
+        2000
+      );
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (match) setResult(JSON.parse(match[0]));
+    } catch (e) {
+      alert('Error: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectedMood = MOODS.find(m => m.id === mood);
+
+  return (
+    <div className="space-y-6">
+      <HowTo
+        when="you want to make a Punjabi/Hindi song video with emotional text overlays synced to the beat"
+        steps={[
+          'Pick your mood, language, duration and describe the song vibe (optional)',
+          'Generate — you get text overlays with exact timestamps, footage to search, and hashtags',
+          'Click "Export for CapCut" → follow 5 steps → add your song → done',
+        ]}
+      />
+
+      <div className="card space-y-5">
+        <div>
+          <h2 className="text-lg font-bold text-white">Song Video</h2>
+          <p className="text-white/40 text-sm mt-1">Text overlays + footage + hashtags matched to your song mood. No voice needed.</p>
+        </div>
+
+        {/* Mood */}
+        <div>
+          <label className="text-sm text-white/50 mb-2 block">Mood *</label>
+          <div className="grid grid-cols-3 gap-2">
+            {MOODS.map(m => (
+              <button key={m.id} onClick={() => setMood(m.id)}
+                className={`py-3 rounded-2xl text-sm font-semibold flex flex-col items-center gap-1 transition-all duration-200 ${
+                  mood === m.id
+                    ? `bg-gradient-to-br ${m.grad} text-white shadow-lg scale-[1.02]`
+                    : 'bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10'
+                }`}>
+                <span className="text-xl">{m.emoji}</span>
+                <span>{m.label}</span>
+                <span className="text-xs opacity-60">{m.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Language */}
+        <div>
+          <label className="text-sm text-white/50 mb-2 block">Language</label>
+          <div className="grid grid-cols-4 gap-2">
+            {SONG_LANGS.map(l => (
+              <button key={l.id} onClick={() => setLanguage(l.id)}
+                className={`py-2.5 rounded-2xl text-xs font-semibold flex flex-col items-center gap-0.5 transition-all ${
+                  language === l.id
+                    ? 'bg-brand-500/30 border border-brand-500/60 text-white'
+                    : 'bg-white/5 border border-white/10 text-white/50 hover:text-white'
+                }`}>
+                <span className="font-bold">{l.label}</span>
+                <span className="text-white/30 text-[10px]">{l.note}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Duration + Platform */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm text-white/50 mb-2 block">Duration</label>
+            <div className="grid grid-cols-3 gap-2">
+              {SHORT_DURATIONS.map(d => (
+                <button key={d.id} onClick={() => setDuration(d.id)}
+                  className={`py-2 rounded-xl text-xs font-medium transition-all ${
+                    duration === d.id ? 'bg-brand-500/30 border border-brand-500/60 text-white' : 'glass text-white/50 border border-transparent hover:text-white'
+                  }`}>{d.label}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="text-sm text-white/50 mb-2 block">Platform</label>
+            <div className="grid grid-cols-3 gap-2">
+              {SHORTS_PLATFORMS.map(p => (
+                <button key={p.id} onClick={() => setPlatform(p.id)}
+                  className={`py-2 rounded-xl text-xs font-medium flex flex-col items-center gap-0.5 transition-all ${
+                    platform === p.id ? 'bg-brand-500/30 border border-brand-500/60 text-white' : 'glass text-white/50 border border-transparent hover:text-white'
+                  }`}>
+                  <span>{p.emoji}</span>
+                  <span>{p.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Song vibe */}
+        <div>
+          <label className="text-sm text-white/50 mb-1.5 block">Song name or vibe <span className="text-white/25">(optional)</span></label>
+          <input value={songVibe} onChange={e => setSongVibe(e.target.value)}
+            placeholder={`e.g. "Arjan Dhillon sad song" or "night drive lonely feeling"`}
+            className="input-field" />
+        </div>
+
+        <button onClick={generate} disabled={loading}
+          className={`w-full py-4 rounded-2xl font-bold text-white text-base flex items-center justify-center gap-2 transition-all ${
+            loading ? 'opacity-50 cursor-not-allowed bg-white/10' : `bg-gradient-to-r ${selectedMood?.grad} hover:opacity-90 hover:scale-[1.01] shadow-lg`
+          }`}>
+          {loading
+            ? <><RefreshCw className="w-5 h-5 animate-spin" /> Generating overlays...</>
+            : <><span className="text-xl">{selectedMood?.emoji}</span> Generate {selectedMood?.label} Video Script</>}
+        </button>
+      </div>
+
+      {result && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-white/25">Saved — go back anytime, it'll still be here</p>
+            <button onClick={clearAll} className="flex items-center gap-1.5 text-xs text-red-400/70 hover:text-red-400 transition-colors">
+              <Trash2 className="w-3.5 h-3.5" /> Clear
+            </button>
+          </div>
+
+          {/* Text Overlays */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-bold text-white/70">💬 Text Overlays</span>
+              <CopyBtn text={(result.overlays || []).map(o => `${o.timeStart}s–${o.timeEnd}s → "${o.text}" (${o.style})`).join('\n')} />
+            </div>
+            <div className="space-y-3">
+              {(result.overlays || []).map((o, i) => (
+                <div key={i} className="flex gap-3 items-start py-3 border-b border-white/5 last:border-0 last:pb-0">
+                  <span className="flex-shrink-0 text-xs text-brand-400 font-mono w-16">{o.timeStart}s–{o.timeEnd}s</span>
+                  <div className="flex-1">
+                    <p className="text-white font-bold text-base leading-snug">"{o.text}"</p>
+                    <p className="text-white/30 text-xs mt-1">Style: {o.style}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footage */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-bold text-white/70">🎬 Footage to Search</span>
+              <CopyBtn text={(result.footage || []).map(f => `${f.timeStart}s–${f.timeEnd}s → "${f.search}"`).join('\n')} />
+            </div>
+            <div className="space-y-2">
+              {(result.footage || []).map((f, i) => (
+                <div key={i} className="flex gap-3 items-center py-2 border-b border-white/5 last:border-0">
+                  <span className="text-xs text-brand-400 font-mono w-16 flex-shrink-0">{f.timeStart}s–{f.timeEnd}s</span>
+                  <span className="text-white/70 text-sm">"{f.search}"</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Caption + Hashtags */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-bold text-white/70">📋 Caption & Hashtags</span>
+              <CopyBtn text={`${result.caption}\n\n${(result.hashtags || []).map(h => `#${h.replace(/^#/, '')}`).join(' ')}`} />
+            </div>
+            <p className="text-white/70 text-sm mb-3 leading-relaxed">{result.caption}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {(result.hashtags || []).map((h, i) => (
+                <span key={i} className="text-xs px-2 py-1 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20">
+                  #{h.replace(/^#/, '')}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Tips */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="card border border-purple-500/20 bg-purple-500/5">
+              <span className="text-xs font-bold text-purple-400 uppercase tracking-wider block mb-2">🥁 Beat Sync Tip</span>
+              <p className="text-white/70 text-sm leading-relaxed">{result.beatTip}</p>
+            </div>
+            <div className="card border border-green-500/20 bg-green-500/5">
+              <span className="text-xs font-bold text-green-400 uppercase tracking-wider block mb-2">📅 Best Time to Post</span>
+              <p className="text-white/70 text-sm leading-relaxed">{result.postingTip}</p>
+            </div>
+          </div>
+
+          <button onClick={() => setShowCapCut(true)}
+            className={`w-full py-4 rounded-2xl bg-gradient-to-r ${selectedMood?.grad} text-white font-bold text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90`}>
+            🎬 Export for CapCut — 5 Steps
+          </button>
+
+          <button onClick={generate}
+            className="w-full py-3 glass glass-hover rounded-xl text-white/50 hover:text-white text-sm flex items-center justify-center gap-2 transition-all">
+            <RefreshCw className="w-4 h-4" /> Regenerate
+          </button>
+        </div>
+      )}
+
+      {showCapCut && result && (
+        <SongCapCutModal result={result} mood={mood} onClose={() => setShowCapCut(false)} />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const TABS = [
-  { id: 'hooks', label: 'Hook Writer', emoji: '⚡', desc: 'First 3 seconds that stop the scroll' },
+  { id: 'hooks',  label: 'Hook Writer',   emoji: '⚡', desc: 'First 3 seconds that stop the scroll' },
   { id: 'shorts', label: 'Shorts Engine', emoji: '📱', desc: 'Frame-by-frame scripts with loop endings' },
+  { id: 'song',   label: 'Song Video',    emoji: '🎵', desc: 'Text overlays for Punjabi/Hindi song videos' },
 ];
 
 export default function GrowthTools() {
@@ -735,6 +1096,7 @@ export default function GrowthTools() {
 
         {tab === 'hooks' && <HookWriter />}
         {tab === 'shorts' && <ShortsEngine />}
+        {tab === 'song' && <SongVideo />}
       </div>
     </div>
   );
