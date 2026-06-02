@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Zap, ChevronLeft, Copy, Check, RefreshCw, Play, Sparkles, Trash2, Music, ExternalLink, TrendingUp, ChevronDown } from 'lucide-react';
+import { Zap, ChevronLeft, Copy, Check, RefreshCw, Play, Sparkles, Trash2, Music, ExternalLink, TrendingUp, ChevronDown, Dice5 } from 'lucide-react';
 import { callAI } from '../services/api.js';
 import { hasValidKey } from '../services/providers.js';
 import { HowTo } from '../components/HowTo.jsx';
@@ -1138,17 +1138,302 @@ Rules:
   );
 }
 
+// ─── Today's Video (one-tap complete idea) ──────────────────────────────────────
+
+function CopyLine({ text }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+      className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all ${copied ? 'bg-green-500/20 text-green-400' : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white'}`}
+      title="Copy">
+      {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+    </button>
+  );
+}
+
+function DailyVideo() {
+  const [mood, setMood] = useLocalStorage('dv_mood', 'surprise');
+  const [language, setLanguage] = useLocalStorage('dv_lang', 'punjabi');
+  const [result, setResult] = useLocalStorage('dv_result', null);
+  const [loading, setLoading] = useState(false);
+  const [showCapCut, setShowCapCut] = useState(false);
+
+  const clearAll = () => { setResult(null); setShowCapCut(false); };
+
+  const generate = async () => {
+    if (!hasValidKey()) { alert('Set your API key first.'); return; }
+    setLoading(true);
+    setResult(null);
+    const pickedMood = mood === 'surprise'
+      ? MOODS[Math.floor(Math.random() * MOODS.length)]
+      : MOODS.find(m => m.id === mood);
+    const langNote = language === 'punjabi'
+      ? 'Write the overlay text in Punjabi using Gurmukhi script (ਇਸ ਤਰ੍ਹਾਂ). Not Roman.'
+      : language === 'hindi'
+      ? 'Write the overlay text in Hindi using Devanagari script (इस तरह).'
+      : language === 'hinglish'
+      ? 'Write the overlay text in Hinglish (Roman script mixing Hindi/English, e.g. "Dil toot gaya yaar").'
+      : 'Write the overlay text in English.';
+    try {
+      const raw = await callAI(
+        `You are a viral content director for Indian (Punjabi/Hindi) song videos on Reels, Shorts and TikTok. You hand a beginner creator ONE complete, ready-to-shoot video so they never have to think. Everything must be concrete and copy-paste ready.`,
+        `Give me ONE complete song video to make RIGHT NOW.
+
+Mood: ${pickedMood.label} — ${pickedMood.desc}
+Language for on-screen text: ${language}
+Format: 9:16 vertical, 20-35 seconds, for Reels/Shorts/TikTok.
+${langNote}
+
+This is for a beginner with 0 followers using CapCut free + a trending song. Make it SO clear they just open CapCut and build it.
+
+Return ONLY valid JSON:
+{
+  "idea": "One punchy sentence: what this video IS (the concept)",
+  "songSearch": "Exact text to type into Instagram/CapCut music search to find a fitting ${pickedMood.label.toLowerCase()} ${language} song (e.g. 'Arjan Dhillon slowed sad')",
+  "firstSecond": "Exactly what happens in the FIRST 1 second to stop the scroll (the visual + the first overlay word)",
+  "overlays": [
+    { "at": "0-4s", "text": "on-screen line, MAX 6 words, emotional", "note": "where/how it appears on screen" }
+  ],
+  "footage": [
+    { "at": "0-4s", "search": "exact CapCut stock search term — cinematic, matches mood, Indian context where relevant" }
+  ],
+  "caption": "Ready-to-paste caption in ${language}, 1-2 lines, emotional",
+  "hashtags": ["10 mixed hashtags: mood + punjabi/hindi music + reels/shorts"],
+  "why": "One sentence: why THIS video can get views/saves from strangers"
+}
+
+Rules:
+- 4 to 6 overlays, 4 to 6 footage clips, timed to cover ~25-30s
+- Overlays must hit the emotion HARD — poetic, not informational
+- First second must be a genuine scroll-stopper
+- Be specific everywhere — no vague placeholders`,
+        1800
+      );
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        parsed._mood = pickedMood.id;
+        setResult(parsed);
+      }
+    } catch (e) {
+      alert('Error: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // adapt result shape for the existing SongCapCutModal
+  const capcutResult = result ? {
+    footage: (result.footage || []).map(f => {
+      const [a, b] = (f.at || '0-4s').replace(/s/g, '').split('-');
+      return { timeStart: a || 0, timeEnd: b || 4, search: f.search };
+    }),
+    overlays: (result.overlays || []).map(o => {
+      const [a, b] = (o.at || '0-4s').replace(/s/g, '').split('-');
+      return { timeStart: a || 0, timeEnd: b || 4, text: o.text, style: o.note };
+    }),
+    caption: result.caption,
+    hashtags: result.hashtags,
+    beatTip: 'Use Auto Beat Sync so the clips cut on every beat. Drop your strongest overlay on the beat drop.',
+    postingTip: 'Post between 7-10pm. Reels & Shorts both — same video, both apps.',
+  } : null;
+
+  const moodObj = result ? MOODS.find(m => m.id === result._mood) : null;
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-cyan-500/25 bg-cyan-500/[0.06] px-4 py-4">
+        <p className="text-sm text-white font-bold mb-1">🎬 Never stare at a blank screen again</p>
+        <p className="text-xs text-white/50 leading-relaxed">
+          Pick a mood (or hit Surprise) → tap once → get ONE complete video to make right now:
+          the idea, the song to search, the first second, every overlay line, the footage, and the caption.
+          Copy each piece straight into CapCut.
+        </p>
+      </div>
+
+      <TrendingSongs />
+
+      <div className="card space-y-5">
+        <div>
+          <h2 className="text-lg font-bold text-white">Today's Video</h2>
+          <p className="text-white/40 text-sm mt-1">One tap. One finished plan. Go make it.</p>
+        </div>
+
+        {/* Mood incl. Surprise */}
+        <div>
+          <label className="text-sm text-white/50 mb-2 block">What mood today?</label>
+          <div className="grid grid-cols-3 gap-2">
+            <button onClick={() => setMood('surprise')}
+              className={`py-3 rounded-2xl text-sm font-semibold flex flex-col items-center gap-1 transition-all ${
+                mood === 'surprise' ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-lg scale-[1.02]' : 'bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10'
+              }`}>
+              <Dice5 className="w-5 h-5" />
+              <span>Surprise</span>
+              <span className="text-xs opacity-60">Pick for me</span>
+            </button>
+            {MOODS.map(m => (
+              <button key={m.id} onClick={() => setMood(m.id)}
+                className={`py-3 rounded-2xl text-sm font-semibold flex flex-col items-center gap-1 transition-all ${
+                  mood === m.id ? `bg-gradient-to-br ${m.grad} text-white shadow-lg scale-[1.02]` : 'bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10'
+                }`}>
+                <span className="text-xl">{m.emoji}</span>
+                <span>{m.label}</span>
+                <span className="text-xs opacity-60">{m.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Language */}
+        <div>
+          <label className="text-sm text-white/50 mb-2 block">On-screen text language</label>
+          <div className="grid grid-cols-4 gap-2">
+            {SONG_LANGS.map(l => (
+              <button key={l.id} onClick={() => setLanguage(l.id)}
+                className={`py-2.5 rounded-2xl text-xs font-semibold flex flex-col items-center gap-0.5 transition-all ${
+                  language === l.id ? 'bg-brand-500/30 border border-brand-500/60 text-white' : 'bg-white/5 border border-white/10 text-white/50 hover:text-white'
+                }`}>
+                <span className="font-bold">{l.label}</span>
+                <span className="text-white/30 text-[10px]">{l.note}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button onClick={generate} disabled={loading}
+          className={`w-full py-4 rounded-2xl font-bold text-white text-base flex items-center justify-center gap-2 transition-all ${
+            loading ? 'opacity-50 cursor-not-allowed bg-white/10' : 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:opacity-90 hover:scale-[1.01] shadow-lg'
+          }`}>
+          {loading
+            ? <><RefreshCw className="w-5 h-5 animate-spin" /> Building your video...</>
+            : <><Sparkles className="w-5 h-5" /> Give me today's video</>}
+        </button>
+      </div>
+
+      {result && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-white/25">Saved — go back anytime, it'll still be here</p>
+            <button onClick={clearAll} className="flex items-center gap-1.5 text-xs text-red-400/70 hover:text-red-400 transition-colors">
+              <Trash2 className="w-3.5 h-3.5" /> Clear
+            </button>
+          </div>
+
+          {/* The idea */}
+          <div className={`card bg-gradient-to-br ${moodObj?.grad || 'from-cyan-600 to-blue-700'} border-0`}>
+            <p className="text-xs font-bold text-white/70 uppercase tracking-wider mb-1.5">
+              {moodObj?.emoji} {moodObj?.label} · Today's video
+            </p>
+            <p className="text-white text-xl font-black leading-snug">{result.idea}</p>
+            {result.why && <p className="text-white/70 text-xs mt-3">✨ {result.why}</p>}
+          </div>
+
+          {/* Song to find */}
+          <div className="card border border-fuchsia-500/25 bg-fuchsia-500/5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <Music className="w-4 h-4 text-fuchsia-400 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-fuchsia-300 uppercase tracking-wider">Find this song</p>
+                  <p className="text-white font-semibold text-sm truncate">"{result.songSearch}"</p>
+                </div>
+              </div>
+              <CopyLine text={result.songSearch} />
+            </div>
+            <p className="text-white/40 text-xs mt-2">Search this in Instagram music or CapCut. Pick one with the trending ↗ arrow.</p>
+          </div>
+
+          {/* First second */}
+          <div className="card border border-red-500/25 bg-red-500/5">
+            <p className="text-xs font-bold text-red-400 uppercase tracking-wider mb-1.5">⚡ First 1 second (scroll-stopper)</p>
+            <p className="text-white text-base font-semibold leading-snug">{result.firstSecond}</p>
+          </div>
+
+          {/* Overlays */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-bold text-white/70">💬 Text Overlays — copy each line</span>
+              <CopyBtn text={(result.overlays || []).map(o => `${o.at} → "${o.text}"`).join('\n')} />
+            </div>
+            <div className="space-y-2.5">
+              {(result.overlays || []).map((o, i) => (
+                <div key={i} className="flex gap-3 items-center py-2.5 px-3 rounded-xl bg-white/[0.03] border border-white/5">
+                  <span className="flex-shrink-0 text-xs text-brand-400 font-mono w-14">{o.at}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-bold text-base leading-snug">"{o.text}"</p>
+                    {o.note && <p className="text-white/30 text-xs mt-0.5">{o.note}</p>}
+                  </div>
+                  <CopyLine text={o.text} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footage */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-sm font-bold text-white/70">🎬 Footage to Search in CapCut</span>
+              <CopyBtn text={(result.footage || []).map(f => `${f.at} → "${f.search}"`).join('\n')} />
+            </div>
+            <div className="space-y-2">
+              {(result.footage || []).map((f, i) => (
+                <div key={i} className="flex gap-3 items-center py-2 border-b border-white/5 last:border-0">
+                  <span className="text-xs text-brand-400 font-mono w-14 flex-shrink-0">{f.at}</span>
+                  <span className="text-white/70 text-sm flex-1">"{f.search}"</span>
+                  <CopyLine text={f.search} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Caption */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-bold text-white/70">📋 Caption & Hashtags</span>
+              <CopyBtn text={`${result.caption}\n\n${(result.hashtags || []).map(h => `#${h.replace(/^#/, '')}`).join(' ')}`} />
+            </div>
+            <p className="text-white/70 text-sm mb-3 leading-relaxed">{result.caption}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {(result.hashtags || []).map((h, i) => (
+                <span key={i} className="text-xs px-2 py-1 rounded-full bg-brand-500/10 text-brand-400 border border-brand-500/20">
+                  #{h.replace(/^#/, '')}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={() => setShowCapCut(true)}
+            className={`w-full py-4 rounded-2xl bg-gradient-to-r ${moodObj?.grad || 'from-cyan-500 to-blue-600'} text-white font-bold text-sm flex items-center justify-center gap-2 transition-all hover:opacity-90`}>
+            🎬 Build it in CapCut — Step-by-Step
+          </button>
+
+          <button onClick={generate}
+            className="w-full py-3 glass glass-hover rounded-xl text-white/50 hover:text-white text-sm flex items-center justify-center gap-2 transition-all">
+            <Dice5 className="w-4 h-4" /> Give me a different video
+          </button>
+        </div>
+      )}
+
+      {showCapCut && capcutResult && (
+        <SongCapCutModal result={capcutResult} mood={result._mood} onClose={() => setShowCapCut(false)} />
+      )}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 const TABS = [
+  { id: 'daily',  label: "Today's Video",  emoji: '🎬', desc: 'One tap → a complete video to make now' },
+  { id: 'song',   label: 'Song Video',    emoji: '🎵', desc: 'Build a custom song video your way' },
   { id: 'hooks',  label: 'Hook Writer',   emoji: '⚡', desc: 'First 3 seconds that stop the scroll' },
   { id: 'shorts', label: 'Shorts Engine', emoji: '📱', desc: 'Frame-by-frame scripts with loop endings' },
-  { id: 'song',   label: 'Song Video',    emoji: '🎵', desc: 'Text overlays for Punjabi/Hindi song videos' },
 ];
 
 export default function GrowthTools() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState('hooks');
+  const [tab, setTab] = useState('daily');
 
   return (
     <div className="min-h-screen bg-dark-950 bg-grid">
@@ -1172,7 +1457,7 @@ export default function GrowthTools() {
       <div className="pt-24 pb-16 px-4 max-w-3xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-black text-white mb-2">Growth Tools</h1>
-          <p className="text-white/50">The two things that move the algorithm: hooks and short-form.</p>
+          <p className="text-white/50">Stuck on what to post? Start with Today's Video — one tap, one finished plan.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3 mb-8">
@@ -1186,9 +1471,10 @@ export default function GrowthTools() {
           ))}
         </div>
 
+        {tab === 'daily' && <DailyVideo />}
+        {tab === 'song' && <SongVideo />}
         {tab === 'hooks' && <HookWriter />}
         {tab === 'shorts' && <ShortsEngine />}
-        {tab === 'song' && <SongVideo />}
       </div>
     </div>
   );
