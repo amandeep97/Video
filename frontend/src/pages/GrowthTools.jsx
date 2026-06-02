@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Zap, ChevronLeft, Copy, Check, RefreshCw, Play, Sparkles, Trash2 } from 'lucide-react';
+import { Zap, ChevronLeft, Copy, Check, RefreshCw, Play, Sparkles, Trash2, Music, ExternalLink, TrendingUp, ChevronDown } from 'lucide-react';
 import { callAI } from '../services/api.js';
 import { hasValidKey } from '../services/providers.js';
 import { HowTo } from '../components/HowTo.jsx';
@@ -773,6 +773,96 @@ function SongCapCutModal({ result, mood, onClose }) {
   );
 }
 
+const TREND_COUNTRIES = [
+  { id: 'IN', label: 'India' },
+  { id: 'PK', label: 'Pakistan' },
+  { id: 'GB', label: 'UK' },
+  { id: 'CA', label: 'Canada' },
+  { id: 'US', label: 'USA' },
+  { id: 'AU', label: 'Australia' },
+];
+
+function TrendingSongs() {
+  const [open, setOpen] = useState(false);
+  const [country, setCountry] = useLocalStorage('ts_country', 'IN');
+
+  // TikTok Creative Center — free official trending songs page
+  const ccUrl = `https://ads.tiktok.com/business/creativecenter/inspiration/popular/music/pc/en?region=${country}`;
+
+  return (
+    <div className="rounded-2xl border border-fuchsia-500/25 bg-fuchsia-500/[0.06] overflow-hidden">
+      <button onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3.5 text-left">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-fuchsia-500 to-pink-600 flex items-center justify-center flex-shrink-0">
+            <Music className="w-4.5 h-4.5 text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-white">Find a Trending Song first</p>
+            <p className="text-xs text-white/40">Real data from TikTok — free & official</p>
+          </div>
+        </div>
+        <ChevronDown className={`w-5 h-5 text-white/40 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 space-y-4 animate-slide-down">
+          <div className="h-px bg-white/10" />
+
+          <p className="text-xs text-white/50 leading-relaxed">
+            Reels & Shorts copy TikTok trends 1–2 weeks later. Pick a song that's <span className="text-fuchsia-300 font-semibold">rising</span> here,
+            then add it in CapCut while it's still climbing.
+          </p>
+
+          {/* Country */}
+          <div>
+            <label className="text-xs text-white/40 mb-1.5 block">Your country</label>
+            <div className="grid grid-cols-3 gap-2">
+              {TREND_COUNTRIES.map(c => (
+                <button key={c.id} onClick={() => setCountry(c.id)}
+                  className={`py-2 rounded-xl text-xs font-medium transition-all ${
+                    country === c.id ? 'bg-fuchsia-500/25 border border-fuchsia-500/50 text-white' : 'bg-white/5 border border-white/10 text-white/50 hover:text-white'
+                  }`}>{c.label}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* Open button */}
+          <a href={ccUrl} target="_blank" rel="noopener noreferrer"
+            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-fuchsia-500 to-pink-600 hover:opacity-90 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all">
+            <TrendingUp className="w-4 h-4" />
+            Open TikTok Trending Songs
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+
+          {/* How to read it */}
+          <div className="rounded-xl bg-black/20 border border-white/5 p-3.5">
+            <p className="text-xs font-bold text-fuchsia-300 uppercase tracking-wider mb-2.5">How to read it</p>
+            <ol className="space-y-2">
+              {[
+                'Set the filter to "Last 7 days" at the top',
+                'Look for a song with a graph going UP (rising) — not flat',
+                'Pick a Punjabi / Hindi one that matches your mood',
+                'Note the song name → search it in CapCut & Instagram music',
+                'Make your video and post within 24–48 hrs while it\'s still rising',
+              ].map((s, i) => (
+                <li key={i} className="flex items-start gap-2 text-xs text-white/55">
+                  <span className="flex-shrink-0 w-4 h-4 rounded-full bg-fuchsia-500/20 text-fuchsia-300 flex items-center justify-center font-bold text-[10px] mt-0.5">{i + 1}</span>
+                  {s}
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          <p className="text-xs text-white/25 leading-relaxed">
+            Tip: TikTok may ask for a free account. Same trends hit Instagram Reels a week later — so you're early there.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SongVideo() {
   const [mood, setMood] = useLocalStorage('sv_mood', 'sad');
   const [language, setLanguage] = useLocalStorage('sv_lang', 'punjabi');
@@ -864,6 +954,8 @@ Rules:
           'Click "Export for CapCut" → follow 5 steps → add your song → done',
         ]}
       />
+
+      <TrendingSongs />
 
       <div className="card space-y-5">
         <div>
