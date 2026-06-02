@@ -1165,9 +1165,17 @@ function DailyVideo() {
     if (!hasValidKey()) { alert('Set your API key first.'); return; }
     setLoading(true);
     setResult(null);
-    const pickedMood = mood === 'surprise'
-      ? MOODS[Math.floor(Math.random() * MOODS.length)]
-      : MOODS.find(m => m.id === mood);
+    // Surprise = your niche strategy: ~80% Feelings lane, ~20% Motivation lane.
+    const FEELINGS = ['sad', 'love', 'betrayal', 'nostalgic'];
+    const MOTIVATION = ['motivational', 'party'];
+    let pickedMood;
+    if (mood === 'surprise') {
+      const lane = Math.random() < 0.8 ? FEELINGS : MOTIVATION;
+      const id = lane[Math.floor(Math.random() * lane.length)];
+      pickedMood = MOODS.find(m => m.id === id);
+    } else {
+      pickedMood = MOODS.find(m => m.id === mood);
+    }
     const langNote = language === 'punjabi'
       ? 'Write the overlay text in Punjabi using Gurmukhi script (ਇਸ ਤਰ੍ਹਾਂ). Not Roman.'
       : language === 'hindi'
@@ -1250,6 +1258,10 @@ Rules:
           the idea, the song to search, the first second, every overlay line, the footage, and the caption.
           Copy each piece straight into CapCut.
         </p>
+        <p className="text-xs text-cyan-300/70 leading-relaxed mt-2">
+          🎯 Your niche: <span className="font-semibold">Feelings</span> (sad · love · nostalgic) with a little motivation now and then.
+          Surprise keeps you ~80% feelings so your page stays focused — that's what grows it.
+        </p>
       </div>
 
       <TrendingSongs />
@@ -1270,7 +1282,7 @@ Rules:
               }`}>
               <Dice5 className="w-5 h-5" />
               <span>Surprise</span>
-              <span className="text-xs opacity-60">Pick for me</span>
+              <span className="text-xs opacity-60">Mostly feelings</span>
             </button>
             {MOODS.map(m => (
               <button key={m.id} onClick={() => setMood(m.id)}
