@@ -43,6 +43,7 @@ function StepBlock({ number, title, color, instruction, icon, text }) {
     green:  'text-green-400 border-green-500/30 bg-green-500/5',
     yellow: 'text-yellow-400 border-yellow-500/30 bg-yellow-500/5',
     purple: 'text-purple-400 border-purple-500/30 bg-purple-500/5',
+    cyan:   'text-cyan-400 border-cyan-500/30 bg-cyan-500/5',
   };
   const cls = palette[color];
   return (
@@ -707,6 +708,8 @@ const SONG_LANGS = [
 ];
 
 function SongCapCutModal({ result, mood, onClose }) {
+  const [mode, setMode] = useState(null); // null = choose, 'auto' = script to video, 'manual' = step by step
+
   const footageLines = (result.footage || []).map(f =>
     `${f.timeStart}s–${f.timeEnd}s  →  search: "${f.search}"`
   ).join('\n');
@@ -716,6 +719,11 @@ function SongCapCutModal({ result, mood, onClose }) {
   ).join('\n');
 
   const captionText = `${result.caption}\n\n${(result.hashtags || []).map(h => `#${h.replace(/^#/, '')}`).join(' ')}`;
+
+  // Short description for CapCut Script to Video — keep under 100 chars
+  const moodLabel = mood || 'sad';
+  const overlayWords = (result.overlays || []).map(o => o.text).join(', ');
+  const scriptToVideoText = `${moodLabel} Punjabi song video, rainy window heartbreak mood, text overlays: ${overlayWords}`.substring(0, 120);
 
   const allSteps =
     `══ STEP 1 — ADD FOOTAGE ══\n${footageLines}\n\n` +
@@ -732,41 +740,114 @@ function SongCapCutModal({ result, mood, onClose }) {
         <div className="card border border-pink-500/30">
           <div className="flex items-start justify-between mb-6">
             <div>
-              <h2 className="text-xl font-bold text-white">Export for CapCut</h2>
-              <p className="text-white/40 text-sm mt-1">5 steps. Song video done in 15 minutes.</p>
+              <h2 className="text-xl font-bold text-white">Build in CapCut</h2>
+              <p className="text-white/40 text-sm mt-1">Pick how you want to build it</p>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <CopyBtn text={allSteps} size="md" />
-              <button onClick={onClose}
-                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-all text-sm">✕</button>
-            </div>
+            <button onClick={onClose}
+              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/60 hover:text-white transition-all text-sm">✕</button>
           </div>
 
-          <div className="space-y-4">
-            <StepBlock number="1" title="ADD FOOTAGE" color="blue" icon="🎬"
-              instruction="CapCut → New Project → search each term in stock library → drag clip to timeline"
-              text={footageLines} />
+          {/* Mode chooser */}
+          {!mode && (
+            <div className="space-y-3">
+              <button onClick={() => setMode('auto')}
+                className="w-full p-4 rounded-2xl border border-cyan-500/40 bg-cyan-500/10 text-left hover:bg-cyan-500/20 transition-all">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-2xl">⚡</span>
+                  <div>
+                    <p className="text-white font-bold">Auto — Script to Video</p>
+                    <p className="text-cyan-300 text-xs">2 minutes · CapCut AI does everything</p>
+                  </div>
+                </div>
+                <p className="text-white/50 text-xs leading-relaxed">Copy one line → paste into CapCut's "Script to Video" → CapCut picks footage, adds text, builds the video automatically. You just add the song.</p>
+              </button>
 
-            <StepBlock number="2" title="ADD YOUR SONG" color="green" icon="🎵"
-              instruction="CapCut → tap + at bottom → Music → My Music (import from phone) OR search song name"
-              text={`Drag the song to the audio track\nTrim it to the part you want\nSet volume to 100%`} />
-
-            <StepBlock number="3" title="BEAT SYNC" color="purple" icon="🥁"
-              instruction="CapCut → select all video clips → tap 'Auto Beat Sync' → turn ON → clips cut to the beat automatically"
-              text={result.beatTip || 'Use Auto Beat Sync for automatic cuts on every beat drop'} />
-
-            <StepBlock number="4" title="TEXT OVERLAYS" color="yellow" icon="💬"
-              instruction="CapCut → Text → Add Text → type each line and drag to the matching timestamp"
-              text={overlayLines} />
-
-            <StepBlock number="5" title="CAPTION & HASHTAGS" color="blue" icon="📋"
-              instruction="Paste this when posting your video"
-              text={captionText} />
-
-            <div className="bg-white/5 rounded-xl p-4 text-sm text-white/50 leading-relaxed">
-              <span className="text-white font-semibold">Final:</span> Export 1080×1920 · 30fps → Post to Shorts/Reels/TikTok
+              <button onClick={() => setMode('manual')}
+                className="w-full p-4 rounded-2xl border border-white/15 bg-white/5 text-left hover:bg-white/10 transition-all">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-2xl">🎬</span>
+                  <div>
+                    <p className="text-white font-bold">Manual — Step by Step</p>
+                    <p className="text-white/40 text-xs">15–20 minutes · Full control over every clip</p>
+                  </div>
+                </div>
+                <p className="text-white/50 text-xs leading-relaxed">Add each footage clip yourself, place every overlay at the exact timestamp. More control, better result.</p>
+              </button>
             </div>
-          </div>
+          )}
+
+          {/* Auto mode */}
+          {mode === 'auto' && (
+            <div className="space-y-4">
+              <button onClick={() => setMode(null)} className="text-xs text-white/40 hover:text-white flex items-center gap-1">← Back</button>
+
+              <StepBlock number="1" title="COPY THIS" color="cyan" icon="📋"
+                instruction="This is your Script to Video prompt — copy it"
+                text={scriptToVideoText} />
+
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-2">
+                <p className="text-xs font-bold text-white/60 uppercase tracking-wider">Step 2 — Open CapCut</p>
+                <ol className="space-y-2">
+                  {[
+                    'CapCut → Edit → New Project',
+                    'At the bottom tap "Script to video"',
+                    'Paste the text you just copied into the Topic box',
+                    'Set Duration to 1 min',
+                    'Tap Generate — CapCut builds the video automatically',
+                    'When done, add your song → Audio → Sounds',
+                    'Export 1080×1920 → Post',
+                  ].map((s, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-white/60">
+                      <span className="flex-shrink-0 w-4 h-4 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-[10px] mt-0.5">{i + 1}</span>
+                      {s}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              <StepBlock number="3" title="CAPTION & HASHTAGS" color="purple" icon="📋"
+                instruction="Paste this when posting"
+                text={captionText} />
+
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-3 text-xs text-yellow-300/80">
+                💡 CapCut's AI picks its own footage — it may not match perfectly. If you want exact control over each clip, go back and use Manual instead.
+              </div>
+            </div>
+          )}
+
+          {/* Manual mode */}
+          {mode === 'manual' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <button onClick={() => setMode(null)} className="text-xs text-white/40 hover:text-white flex items-center gap-1">← Back</button>
+                <CopyBtn text={allSteps} size="md" />
+              </div>
+
+              <StepBlock number="1" title="ADD FOOTAGE" color="blue" icon="🎬"
+                instruction="CapCut → New Project → Library → search each term → drag clip to timeline"
+                text={footageLines} />
+
+              <StepBlock number="2" title="ADD YOUR SONG" color="green" icon="🎵"
+                instruction="CapCut → Audio → Sounds → search song name → add it"
+                text={`Drag the song to the audio track\nTrim it to the part you want\nSet volume to 100%`} />
+
+              <StepBlock number="3" title="BEAT SYNC" color="purple" icon="🥁"
+                instruction="Select all video clips → tap 'Auto Beat Sync' → ON → clips cut to beat automatically"
+                text={result.beatTip || 'Use Auto Beat Sync for automatic cuts on every beat drop'} />
+
+              <StepBlock number="4" title="TEXT OVERLAYS" color="yellow" icon="💬"
+                instruction="Text → Add Text → type each line → white bold → drag to matching timestamp"
+                text={overlayLines} />
+
+              <StepBlock number="5" title="CAPTION & HASHTAGS" color="blue" icon="📋"
+                instruction="Paste this when posting"
+                text={captionText} />
+
+              <div className="bg-white/5 rounded-xl p-4 text-sm text-white/50 leading-relaxed">
+                <span className="text-white font-semibold">Final:</span> Export 1080×1920 · 30fps → Post to Reels/Shorts
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
