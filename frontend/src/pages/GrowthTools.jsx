@@ -720,10 +720,11 @@ function SongCapCutModal({ result, mood, onClose }) {
 
   const captionText = `${result.caption}\n\n${(result.hashtags || []).map(h => `#${h.replace(/^#/, '')}`).join(' ')}`;
 
-  // Short description for CapCut Script to Video — keep under 100 chars
+  // Script to Video prompt — specific scenes + overlays so every video is different
   const moodLabel = mood || 'sad';
-  const overlayWords = (result.overlays || []).map(o => o.text).join(', ');
-  const scriptToVideoText = `${moodLabel} Punjabi song video, rainy window heartbreak mood, text overlays: ${overlayWords}`.substring(0, 120);
+  const footageScenes = (result.footage || []).map(f => f.search).join('; ');
+  const overlayWords = (result.overlays || []).map(o => o.text).join(' · ');
+  const scriptToVideoText = `Cinematic ${moodLabel} music video. Scenes: ${footageScenes}. On-screen text one by one: ${overlayWords}. Style: slow, emotional, no voiceover.`.substring(0, 200);
 
   const allSteps =
     `══ STEP 1 — ADD FOOTAGE ══\n${footageLines}\n\n` +
