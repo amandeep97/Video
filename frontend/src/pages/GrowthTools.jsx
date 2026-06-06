@@ -1009,7 +1009,9 @@ Return ONLY valid JSON:
 Rules:
 - Overlays must FEEL like they match the song emotion — poetic, not informational
 - Each overlay MAX 6 words — punchy and visual
-- Footage must be specific and cinematic (not generic)
+- Footage must be specific and cinematic — NEVER use "rain on window" or "rainy window" — pick unexpected, varied scenes
+- Footage ideas by mood: sad=(empty park bench, old photograph in hand, candle in dark room, person waiting at door, dried flowers, city lights at night, empty coffee cup, person sitting alone on rooftop); love=(golden hour couple silhouette, hands intertwined, flowers blooming, sunset drive, letters written by hand); motivational=(person running at dawn, mountain peak, fist pump, lone figure on hill, sunrise over city); nostalgic=(old swing set, childhood street, faded polaroid, school corridor, empty field at golden hour)
+- Each video must use DIFFERENT footage — never repeat the same scenes
 - Total time must equal ${secs} seconds
 - Hashtags: 5 mood-specific + 5 Punjabi/Indian music + 5 platform = 15 total
 - Make the viewer FEEL the emotion just from the text overlays alone`,
@@ -1286,7 +1288,7 @@ Return ONLY valid JSON:
     { "at": "0-4s", "text": "on-screen line, MAX 6 words, emotional", "note": "where/how it appears on screen" }
   ],
   "footage": [
-    { "at": "0-4s", "search": "exact CapCut stock search term — cinematic, matches mood, Indian context where relevant" }
+    { "at": "0-4s", "search": "exact CapCut stock search term — cinematic, NEVER 'rain on window' or 'rainy window', pick unexpected varied scenes. Sad ideas: empty park bench dusk, old photograph hand, candle dark room, person waiting door, dried flowers, city lights night, empty coffee cup, rooftop alone. Love: golden hour silhouette, hands intertwined, sunset drive, handwritten letter. Motivational: running at dawn, mountain peak, sunrise city, lone figure hill. Nostalgic: old swing set, faded polaroid, empty field golden hour." }
   ],
   "caption": "Ready-to-paste caption in ${language}, 1-2 lines, emotional",
   "hashtags": ["10 mixed hashtags: mood + punjabi/hindi music + reels/shorts"],
