@@ -972,49 +972,59 @@ function SongVideo() {
       : 'Write ALL text overlays in English.';
     try {
       const raw = await callAI(
-        `You are an expert at creating viral text overlay scripts for Indian song videos on YouTube Shorts, Instagram Reels, and TikTok. You understand Punjabi culture, emotions, and what makes song videos go viral.`,
-        `Create a complete text overlay script for a ${mood} mood song video:
+        `You are the best Punjabi/Hindi viral content strategist. You know what makes people STOP, SCREENSHOT, and SHARE song videos. Generic overlays get 200 views. Specific overlays get 200,000. The difference: "ਤੇਰੀ ਯਾਦ" = generic = ignored. "ਜਿਸ ਨੰਬਰ ਦਾ ਇੰਤਜ਼ਾਰ ਸੀ ਉਹੀ block ਕਰਨਾ ਪਿਆ" = specific = viral.`,
+        `Create a complete overlay script for a ${moodObj.label} song video.
 
 Mood: ${moodObj.label} — ${moodObj.desc}
-Language: ${language}
-Duration: ${secs} seconds
-Platform: ${platform}
 Song vibe: ${songVibe || `a ${mood} Punjabi song`}
+Language: ${language} — ${scriptNote}
+Duration: ${secs}s · Platform: ${platform}
 
-${scriptNote}
+OVERLAYS must be HYPER-SPECIFIC and SCREENSHOT-ABLE:
+❌ BANNED — too generic, already on 10,000 pages: ਤੇਰੀ ਯਾਦ, dil toot gaya, missing you, yaad aa raha, I miss you, ਦਿਲ ਟੁੱਟਿਆ
+✅ REQUIRED — specific situation, people screenshot this:
+Sad: "3 ਵਜੇ ਦਾ last seen", "ਉਹੀ ਨੰਬਰ block ਕਰਨਾ ਪਿਆ", "chat delete ਕੀਤੀ screenshots ਨਹੀਂ"
+Love: "ਉਹਦੀ ਆਵਾਜ਼ ਅੱਜ ਵੀ ringtone ਹੈ", "ਉਹ ਵਾਲੀ ਜਗ੍ਹਾ ਬੰਦ ਹੋ ਗਈ"
+Betrayal: "ਉਹ screenshot ਜੋ ਭੇਜ ਦਿੱਤਾ ਹੋਰਾਂ ਨੂੰ"
+Motivational: "2am gym, ਕੋਈ ਨਹੀਂ ਸੀ ਦੇਖਣ ਵਾਲਾ"
+Nostalgic: "ਉਹ number ਹੁਣ exist ਨਹੀਂ ਕਰਦਾ"
+
+Pick ONE overlay format and commit to it:
+A) Situation — exact relatable moment
+B) Timestamp — 3am, last Sunday, November 2023
+C) Contrast — ਪਹਿਲਾਂ vs ਹੁਣ
+D) Single-word build — one powerful word per slide
+E) Direct address — speaking to the person: "ਤੂੰ ਜਾਣਦਾ ਸੀ..."
 
 Return ONLY valid JSON:
 {
+  "overlayFormat": "format chosen and why",
   "overlays": [
     {
       "timeStart": 0,
       "timeEnd": 4,
-      "text": "text shown on screen — SHORT, max 6 words, emotionally powerful",
-      "style": "how it looks in CapCut (e.g. centre white bold, fade in bottom, glitch top)"
+      "text": "hyper-specific line — NOT generic",
+      "style": "position + style in CapCut (e.g. centre white bold fade-in)"
     }
   ],
   "footage": [
     {
       "timeStart": 0,
       "timeEnd": 4,
-      "search": "specific CapCut stock footage search term that matches the visual mood"
+      "search": "specific CapCut stock — NEVER rain on window. Options: phone screen last message, empty park bench dusk, candle melting dark room, city traffic timelapse night, hands letting go slow motion, door closing empty hallway, coffee cup cold, rooftop city night, sunset through car window, gym alone morning, old photograph close up, dried rose petals, handwritten note, mountain road fog, empty school corridor"
     }
   ],
-  "caption": "emotional caption for posting — 2-3 sentences matching the mood, in ${language}",
-  "hashtags": ["hashtag1", "hashtag2"],
-  "beatTip": "One specific tip for syncing these overlays with the song beat in CapCut",
-  "postingTip": "Best time and day to post this mood content for maximum reach on ${platform}"
+  "caption": "Emotional caption in ${language} — ends with a question that makes people reply or tag someone",
+  "hashtags": ["5 mood + 5 Punjabi/Hindi music + 5 platform = 15 total"],
+  "beatTip": "Specific tip for syncing overlays to beat in CapCut",
+  "postingTip": "Best time to post for maximum reach"
 }
 
 Rules:
-- Overlays must FEEL like they match the song emotion — poetic, not informational
-- Each overlay MAX 6 words — punchy and visual
-- Footage must be specific and cinematic — NEVER use "rain on window" or "rainy window" — pick unexpected, varied scenes
-- Footage ideas by mood: sad=(empty park bench, old photograph in hand, candle in dark room, person waiting at door, dried flowers, city lights at night, empty coffee cup, person sitting alone on rooftop); love=(golden hour couple silhouette, hands intertwined, flowers blooming, sunset drive, letters written by hand); motivational=(person running at dawn, mountain peak, fist pump, lone figure on hill, sunrise over city); nostalgic=(old swing set, childhood street, faded polaroid, school corridor, empty field at golden hour)
-- Each video must use DIFFERENT footage — never repeat the same scenes
-- Total time must equal ${secs} seconds
-- Hashtags: 5 mood-specific + 5 Punjabi/Indian music + 5 platform = 15 total
-- Make the viewer FEEL the emotion just from the text overlays alone`,
+- Total = ${secs}s exactly
+- Every overlay: specific enough people think 'this is exactly me'
+- Caption must end with a question — comments boost algorithm
+- Different footage every time — never repeat`,
         2000
       );
       const match = raw.match(/\{[\s\S]*\}/);
@@ -1269,38 +1279,52 @@ function DailyVideo() {
       : 'Write the overlay text in English.';
     try {
       const raw = await callAI(
-        `You are a viral content director for Indian (Punjabi/Hindi) song videos on Reels, Shorts and TikTok. You hand a beginner creator ONE complete, ready-to-shoot video so they never have to think. Everything must be concrete and copy-paste ready.`,
-        `Give me ONE complete song video to make RIGHT NOW.
-
-Mood: ${pickedMood.label} — ${pickedMood.desc}
-Language for on-screen text: ${language}
-Format: 9:16 vertical, 20-35 seconds, for Reels/Shorts/TikTok.
+        `You are the best Punjabi/Hindi viral content strategist. You study what makes people STOP, SCREENSHOT, and SHARE song videos. You know the difference between generic content that gets 200 views and specific content that gets 200,000 views. The difference is always SPECIFICITY — lines so accurate to a real human feeling that people think "this is exactly me."`,
+        `Create ONE complete viral song video. Mood: ${pickedMood.label}. Language: ${language}.
 ${langNote}
 
-This is for a beginner with 0 followers using CapCut free + a trending song. Make it SO clear they just open CapCut and build it.
+CRITICAL — The overlays must be HYPER-SPECIFIC, not generic:
+❌ WRONG (generic, boring, everyone does this): "ਤੇਰੀ ਯਾਦ", "dil toot gaya", "missing you"
+✅ RIGHT (specific, screenshot-able, viral): "ਜਿਸ ਨੰਬਰ ਦਾ ਇੰਤਜ਼ਾਰ ਸੀ, ਉਹੀ block ਕਰਨਾ ਪਿਆ", "3 ਵਜੇ ਰਾਤ ਨੂੰ ਵੀ online ਦਿਖਦਾ ਸੀ, ਹੁਣ ਨਹੀਂ", "last seen: ਕਦੇ ਨਹੀਂ ਦੇਖਾਂਗੇ"
+
+The specific feeling for ${pickedMood.label}:
+- Sad: the exact moment it hit (checking their profile, deleting chats, seeing their contact saved)
+- Love: the tiny detail only that person would understand (their laugh, a specific place, a song)
+- Motivational: the exact low point before the rise (alone at 2am, people doubted, no money)
+- Nostalgic: the specific thing that's gone (a street, a person's voice, old phone photos)
+- Betrayal: the specific moment of realisation (a screenshot, a lie caught, a mutual friend)
+- Party: the specific feeling of being alive (this exact night, these exact people)
+
+Pick a format that matches the mood — vary it each time:
+- Single-word hit (one powerful word per overlay, building a poem)
+- Situation overlay (describes an exact relatable situation, 6-8 words)
+- Contrast overlay (then vs now / was vs is)
+- Question overlay (asks the exact question they're feeling)
+- Timestamp overlay (3 ਵਜੇ, Sunday morning, last November)
 
 Return ONLY valid JSON:
 {
-  "idea": "One punchy sentence: what this video IS (the concept)",
-  "songSearch": "Exact text to type into Instagram/CapCut music search to find a fitting ${pickedMood.label.toLowerCase()} ${language} song (e.g. 'Arjan Dhillon slowed sad')",
-  "firstSecond": "Exactly what happens in the FIRST 1 second to stop the scroll (the visual + the first overlay word)",
+  "idea": "One sentence: the SPECIFIC feeling this video captures (not just the mood — the exact situation)",
+  "format": "which overlay format you chose and why it fits this mood",
+  "songSearch": "Exact search for a ${language} ${pickedMood.label.toLowerCase()} song — be specific (artist + vibe, e.g. 'Karan Aujla BTFU', 'AP Dhillon Excuses slowed', 'Sidhu Moosewala 295')",
+  "firstSecond": "The FIRST frame + first overlay word — must make someone stop scrolling instantly",
   "overlays": [
-    { "at": "0-4s", "text": "on-screen line, MAX 6 words, emotional", "note": "where/how it appears on screen" }
+    { "at": "0-4s", "text": "hyper-specific line — NOT generic", "note": "position and style in CapCut" }
   ],
   "footage": [
-    { "at": "0-4s", "search": "exact CapCut stock search term — cinematic, NEVER 'rain on window' or 'rainy window', pick unexpected varied scenes. Sad ideas: empty park bench dusk, old photograph hand, candle dark room, person waiting door, dried flowers, city lights night, empty coffee cup, rooftop alone. Love: golden hour silhouette, hands intertwined, sunset drive, handwritten letter. Motivational: running at dawn, mountain peak, sunrise city, lone figure hill. Nostalgic: old swing set, faded polaroid, empty field golden hour." }
+    { "at": "0-4s", "search": "specific CapCut stock footage search — NEVER rain on window. Vary every video. Options: empty park bench dusk, old photograph close up, phone screen with last message, candle melting dark room, city traffic timelapse night, hands letting go slow motion, door closing empty hallway, coffee cup getting cold, rooftop city view night, sunset through car window, old swing set empty, gym alone early morning, mountain road fog, handwritten note close up, dried rose petals, phone notifications ignored" }
   ],
-  "caption": "Ready-to-paste caption in ${language}, 1-2 lines, emotional",
-  "hashtags": ["10 mixed hashtags: mood + punjabi/hindi music + reels/shorts"],
-  "why": "One sentence: why THIS video can get views/saves from strangers"
+  "caption": "Caption in ${language} — emotional, ends with a question that makes people reply (e.g. 'ਕਿਸਨੂੰ ਯਾਦ ਕਰ ਰਹੇ ਹੋ ਅੱਜ? 💔')",
+  "hashtags": ["10 hashtags mixing mood + Punjabi/Hindi music + platform"],
+  "why": "Why THIS specific video will get saves — what exact feeling makes people screenshot it"
 }
 
 Rules:
-- 4 to 6 overlays, 4 to 6 footage clips, timed to cover ~25-30s
-- Overlays must hit the emotion HARD — poetic, not informational
-- First second must be a genuine scroll-stopper
-- Be specific everywhere — no vague placeholders`,
-        1800
+- 5-6 overlays total, 4-6 footage clips, ~25-30s total
+- Every overlay must be something people SCREENSHOT — specific enough to feel personal
+- Caption question must make people tag someone or reply
+- Different footage every time — never repeat the same scenes`,
+        2000
       );
       const match = raw.match(/\{[\s\S]*\}/);
       if (match) {
