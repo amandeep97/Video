@@ -972,60 +972,73 @@ function SongVideo() {
       : 'Write ALL text overlays in English.';
     try {
       const raw = await callAI(
-        `You are the best Punjabi/Hindi viral content strategist. You know what makes people STOP, SCREENSHOT, and SHARE song videos. Generic overlays get 200 views. Specific overlays get 200,000. The difference: "ਤੇਰੀ ਯਾਦ" = generic = ignored. "ਜਿਸ ਨੰਬਰ ਦਾ ਇੰਤਜ਼ਾਰ ਸੀ ਉਹੀ block ਕਰਨਾ ਪਿਆ" = specific = viral.`,
-        `Create a complete overlay script for a ${moodObj.label} song video.
+        `You write viral Punjabi/Hindi song video overlay scripts. You specialise in micro-moment specificity — the tiny exact behaviours that make someone stop scrolling and think "this is literally me." You know that "ਤੇਰੀ ਯਾਦ" gets ignored but "14 ਵਾਰ type ਕੀਤਾ, 14 ਵਾਰ delete" gets screenshotted and shared to 10 people.`,
+        `Write a ${moodObj.label} Punjabi song video overlay script.
 
-Mood: ${moodObj.label} — ${moodObj.desc}
 Song vibe: ${songVibe || `a ${mood} Punjabi song`}
 Language: ${language} — ${scriptNote}
 Duration: ${secs}s · Platform: ${platform}
 
-OVERLAYS must be HYPER-SPECIFIC and SCREENSHOT-ABLE:
-❌ BANNED — too generic, already on 10,000 pages: ਤੇਰੀ ਯਾਦ, dil toot gaya, missing you, yaad aa raha, I miss you, ਦਿਲ ਟੁੱਟਿਆ
-✅ REQUIRED — specific situation, people screenshot this:
-Sad: "3 ਵਜੇ ਦਾ last seen", "ਉਹੀ ਨੰਬਰ block ਕਰਨਾ ਪਿਆ", "chat delete ਕੀਤੀ screenshots ਨਹੀਂ"
-Love: "ਉਹਦੀ ਆਵਾਜ਼ ਅੱਜ ਵੀ ringtone ਹੈ", "ਉਹ ਵਾਲੀ ਜਗ੍ਹਾ ਬੰਦ ਹੋ ਗਈ"
-Betrayal: "ਉਹ screenshot ਜੋ ਭੇਜ ਦਿੱਤਾ ਹੋਰਾਂ ਨੂੰ"
-Motivational: "2am gym, ਕੋਈ ਨਹੀਂ ਸੀ ਦੇਖਣ ਵਾਲਾ"
-Nostalgic: "ਉਹ number ਹੁਣ exist ਨਹੀਂ ਕਰਦਾ"
+GOLD STANDARD overlays — this is the quality level required:
+Sad:
+- "ਤੇਰਾ last seen 2:47 'ਤੇ ਰੁਕਿਆ... ਮੈਂ ਅਜੇ ਵੀ 2:48 ਉਡੀਕ ਕਿਰਹਾਂ"
+- "'ਕਿਵੇਂ ਹੋ?' — 14 ਵਾਰ type ਕੀਤਾ, 14 ਵਾਰ delete"
+- "Block... unblock... block... ਪਤਾ ਨਹੀਂ ਸਜ਼ਾ ਤੈਨੂੰ ਦੇ ਰਿਹਾਂ ਜਾਂ ਆਪਸੇ ਆਪ ਨੂੰ"
+- "Fake account ਬਣਾਇਆ — ਸਿਰਫ਼ ਇਹ ਦੇਖਣ ਲਈ ਕਿ ਤੂੰ ਖੁਸ਼ ਹੈ ਜਾਂ ਨਹੀਂ"
+- "Chat delete ਕਰ ਦਿੱਤੀ, ਪਰ screenshots gallery 'ਚ ਲੁਕੇ ਕੇ ਰੱਖੇ ਨੇ"
+- "ਤੇਰਾ ਨਾਂ phone 'ਚੋਂ ਮਿਟਾ ਦਿੱਤਾ, ਪਰ number ਅਜੇ ਵੀ ਜ਼ੁਬਾਨੀ ਯਾਦ ਹੈ"
 
-Pick ONE overlay format and commit to it:
-A) Situation — exact relatable moment
-B) Timestamp — 3am, last Sunday, November 2023
-C) Contrast — ਪਹਿਲਾਂ vs ਹੁਣ
-D) Single-word build — one powerful word per slide
-E) Direct address — speaking to the person: "ਤੂੰ ਜਾਣਦਾ ਸੀ..."
+Love:
+- "ਉਹਦੀ ਆਵਾਜ਼ ਅੱਜ ਵੀ ringtone ਹੈ — ਬਦਲ ਨਹੀਂ ਹੋਈ"
+- "ਉਸ ਦੀ favourite ਜਗ੍ਹਾ ਦੇਖਦਾਂ ਤਾਂ ਅਜੇ ਵੀ ਉਸਨੂੰ ਲੱਭਦਾਂ"
+
+Motivational:
+- "2am gym — ਕੋਈ ਨਹੀਂ ਸੀ ਦੇਖਣ ਵਾਲਾ, ਪਰ ਮੈਂ ਸੀ"
+- "ਉਹਨਾਂ ਨੇ group ਚੋਂ ਕੱਢਿਆ — ਹੁਣ ਮੈਂ headlines ਵਿੱਚ ਹਾਂ"
+
+Betrayal:
+- "ਉਹ screenshots ਜੋ ਭੇਜੇ ਹੋਰਾਂ ਨੂੰ — ਉਹੀ ਦਿਖਾਏ ਸਨ trust ਕਰਕੇ"
+
+Nostalgic:
+- "ਉਹ number ਹੁਣ exist ਨਹੀਂ ਕਰਦਾ"
+- "ਉਹ wali ਸੀਟ ਅੱਜ ਕਿਸੇ ਹੋਰ ਦੀ ਹੈ"
+
+BANNED — generic, already on 10,000 pages, do NOT use:
+ਤੇਰੀ ਯਾਦ, dil toot gaya, missing you, yaad aa raha, ਦਿਲ ਟੁੱਟਿਆ, I miss you, tenu bhulna, broken heart
+
+FOOTAGE — cinematic, specific, varied every time. NEVER rain on window. Use:
+phone screen last message glow dark, typing bubble disappearing, screenshot gallery blurred, empty side of bed, single chair dhaba table, phone screen going black thumb pressing block, slow zoom typing bubble, hand scrolling gallery pausing blurred photo, city lights phone glow dark room, gym mirror alone 2am, mountain road empty fog, old photograph trembling hands, door closing empty hallway, coffee cup untouched cold
 
 Return ONLY valid JSON:
 {
-  "overlayFormat": "format chosen and why",
   "overlays": [
     {
       "timeStart": 0,
-      "timeEnd": 4,
-      "text": "hyper-specific line — NOT generic",
-      "style": "position + style in CapCut (e.g. centre white bold fade-in)"
+      "timeEnd": 5,
+      "text": "micro-moment specific line at gold standard level",
+      "style": "position + style in CapCut (centre white bold fade-in / bottom-left smaller fade / top-right blur-in etc)"
     }
   ],
   "footage": [
     {
       "timeStart": 0,
-      "timeEnd": 4,
-      "search": "specific CapCut stock — NEVER rain on window. Options: phone screen last message, empty park bench dusk, candle melting dark room, city traffic timelapse night, hands letting go slow motion, door closing empty hallway, coffee cup cold, rooftop city night, sunset through car window, gym alone morning, old photograph close up, dried rose petals, handwritten note, mountain road fog, empty school corridor"
+      "timeEnd": 5,
+      "search": "specific CapCut stock search term from the footage list above"
     }
   ],
-  "caption": "Emotional caption in ${language} — ends with a question that makes people reply or tag someone",
+  "caption": "Caption in ${language} — describes the specific situation, ends with a question that makes people tag someone (e.g. ਕਿਸਨੇ ਕੀਤਾ ਇਹ ਤੁਹਾਡੇ ਨਾਲ? 💔)",
   "hashtags": ["5 mood + 5 Punjabi/Hindi music + 5 platform = 15 total"],
-  "beatTip": "Specific tip for syncing overlays to beat in CapCut",
+  "beatTip": "Specific CapCut beat sync tip for this mood",
   "postingTip": "Best time to post for maximum reach"
 }
 
 Rules:
-- Total = ${secs}s exactly
-- Every overlay: specific enough people think 'this is exactly me'
-- Caption must end with a question — comments boost algorithm
-- Different footage every time — never repeat`,
-        2000
+- 5-6 overlays, 5-6 footage clips, total = ${secs}s
+- Every line must describe a SPECIFIC MICRO-MOMENT or EXACT BEHAVIOUR — not a feeling in general
+- The test: would someone screenshot this and send it to a specific person? If yes, keep it. If no, rewrite it.
+- Caption question must make people reply or tag — that drives comments which boost the algorithm
+- Keep cuts on beat drops — note the emotional peak moment`,
+        2200
       );
       const match = raw.match(/\{[\s\S]*\}/);
       if (match) setResult(JSON.parse(match[0]));
