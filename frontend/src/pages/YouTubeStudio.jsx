@@ -154,7 +154,7 @@ function MyChannel({ apiKey }) {
 }
 
 // ── Competitor Spy tab ──────────────────────────────────────────────────────
-const SPY_PRESETS = ['sad punjabi song status', 'punjabi breakup shayari', 'sad punjabi shorts', 'heart broken punjabi song', 'punjabi sad status'];
+const SPY_PRESETS = ['whatsapp status punjabi', 'punjabi lyrics status', 'sad punjabi song status', 'love status punjabi', 'punjabi breakup shayari'];
 
 function CompetitorSpy({ apiKey }) {
   const [q, setQ] = useState('');
@@ -252,12 +252,20 @@ function TitleMaker() {
     setLoading(true); setError(''); setTitles([]);
     try {
       const out = await callAI(
-        'You write YouTube Shorts titles for a Punjabi/Hindi sad-song reels channel. People SEARCH on YouTube, so titles must contain words people actually type, plus an emotional hook and one emoji. Keep each under 70 characters.',
-        `Write 8 YouTube Shorts titles.
+        `You write YouTube Shorts titles for a Punjabi/Hindi status-video channel. The titles that get tens of millions of views use a keyword-stuffed format with "||" separators, packing in the exact phrases people search to download status clips. Real winning examples right now:
+- "Chunari Chunari || Dance || a beautiful transition WhatsApp Status"
+- "Bairan Hindi || new song || WhatsApp Lyrics || Love Status"
+The magic search keywords are: WhatsApp Status, WhatsApp Lyrics, Love Status, Sad Status, Status Video. People type these to find downloadable status reels.`,
+        `Write 8 YouTube Shorts titles in the proven winning format.
 Mood: ${mood}
 Language for the title: ${lang}
-${topic ? `About: ${topic}` : ''}
-Rules: include searchable keywords (e.g. "sad punjabi song status", "breakup shayari"), one emotional hook, exactly one emoji each, under 70 chars. Mix some search-heavy and some hook-heavy.
+${topic ? `About / song: ${topic}` : ''}
+Rules:
+- Use the "||" separator format: Song or hook || descriptor || searchable status keyword
+- EVERY title must include at least one of: WhatsApp Status, WhatsApp Lyrics, Love Status, Sad Status
+- Keep the emotional hook strong but pack in searchable keywords
+- One emoji max per title, under 80 chars
+- Mix: some lead with the song name, some lead with the emotional hook
 Return ONLY the 8 titles, one per line, no numbering, no quotes.`,
         600,
       );
