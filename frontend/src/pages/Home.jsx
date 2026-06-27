@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Video, Sparkles, Zap, Globe, Mic, Layers, ChevronRight,
   Play, Key, TrendingUp, MapPin, Scissors, FlaskConical,
-  TestTube2, Rocket, Menu, X, ArrowRight, Instagram,
+  TestTube2, Rocket, Menu, X, ArrowRight, Instagram, Youtube,
 } from 'lucide-react';
 import ApiKeyModal from '../components/ApiKeyModal.jsx';
 import { hasValidKey, getSettings, PROVIDERS } from '../services/providers.js';
@@ -11,6 +11,7 @@ import { hasValidKey, getSettings, PROVIDERS } from '../services/providers.js';
 const TOOLS = [
   { icon: Zap,          label: 'Growth Tools',    desc: 'Hooks & Shorts scripts',   route: '/tools',     grad: 'from-cyan-400 to-blue-500',    ring: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300' },
   { icon: Instagram,    label: 'Reel Insights',    desc: 'Analyze your reels',       route: '/insights',  grad: 'from-pink-500 to-orange-500',  ring: 'border-pink-500/30 bg-pink-500/10 text-pink-300' },
+  { icon: Youtube,      label: 'YouTube Studio',   desc: 'Spy + analyze + titles',   route: '/youtube',   grad: 'from-red-500 to-red-600',      ring: 'border-red-500/30 bg-red-500/10 text-red-300' },
   { icon: Rocket,       label: 'Launch Kit',       desc: 'Keywords & 30-day plan',   route: '/launch',    grad: 'from-sky-400 to-indigo-500',   ring: 'border-sky-500/30 bg-sky-500/10 text-sky-300' },
   { icon: TestTube2,    label: 'Script Lab',       desc: 'DNA clone & angles',       route: '/scriptlab', grad: 'from-rose-400 to-pink-600',    ring: 'border-rose-500/30 bg-rose-500/10 text-rose-300' },
   { icon: FlaskConical, label: 'Alchemy Lab',      desc: 'Viral content angles',     route: '/alchemy',   grad: 'from-amber-400 to-orange-500', ring: 'border-amber-500/30 bg-amber-500/10 text-amber-300' },
