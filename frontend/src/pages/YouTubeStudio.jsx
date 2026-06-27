@@ -159,17 +159,19 @@ const SPY_PRESETS = ['sad punjabi song status', 'punjabi breakup shayari', 'sad 
 function CompetitorSpy({ apiKey }) {
   const [q, setQ] = useState('');
   const [shortsOnly, setShortsOnly] = useState(true);
+  const [range, setRange] = useState(30); // days; null = all time
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searched, setSearched] = useState(false);
 
-  const run = async (query) => {
+  const run = async (query, days = range) => {
     const term = (query ?? q).trim();
     if (!term) return;
     setQ(term); setLoading(true); setError(''); setSearched(true);
     try {
-      const r = await searchVideos(term, apiKey, { shortsOnly, max: 15 });
+      const publishedAfter = days ? new Date(Date.now() - days * 86400000).toISOString() : undefined;
+      const r = await searchVideos(term, apiKey, { shortsOnly, max: 15, publishedAfter });
       setResults(r);
     } catch (e) { setError(e.message); setResults([]); }
     finally { setLoading(false); }
@@ -177,7 +179,7 @@ function CompetitorSpy({ apiKey }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-white/50">Search any topic to see the top-performing Shorts right now — copy what's working.</p>
+      <p className="text-sm text-white/50">Search any topic to see top-performing videos. Tip: use <b className="text-white/70">This week / This month</b> to find small creators blowing up now — not famous old songs.</p>
       <div className="flex gap-2">
         <input value={q} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Enter' && run()}
           placeholder="e.g. sad punjabi song status" className="input-field text-sm flex-1" />
@@ -192,6 +194,15 @@ function CompetitorSpy({ apiKey }) {
             className="text-xs rounded-full px-3 py-1.5 bg-white/5 border border-white/10 text-white/50 hover:text-white hover:bg-white/10 transition-all">{p}</button>
         ))}
       </div>
+      <div>
+        <p className="text-xs text-white/40 mb-1.5">Time range — recent shows what's winning <span className="text-white/60">now</span>, not famous old songs</p>
+        <div className="flex flex-wrap gap-1.5">
+          {[{ label: 'This week', d: 7 }, { label: 'This month', d: 30 }, { label: 'Last 3 months', d: 90 }, { label: 'All time', d: null }].map(r => (
+            <button key={r.label} onClick={() => { setRange(r.d); if (searched) run(undefined, r.d); }}
+              className={`text-xs px-3 py-1.5 rounded-full border transition-all ${range === r.d ? 'bg-brand-500/20 border-brand-500/50 text-white' : 'bg-white/5 border-white/10 text-white/50 hover:text-white'}`}>{r.label}</button>
+          ))}
+        </div>
+      </div>
       <label className="flex items-center gap-2 text-xs text-white/50">
         <input type="checkbox" checked={shortsOnly} onChange={e => setShortsOnly(e.target.checked)} className="accent-brand-500" />
         Shorts only (under 4 min)
@@ -203,7 +214,7 @@ function CompetitorSpy({ apiKey }) {
         <p className="text-center text-white/40 text-sm py-10">No results. Try another search term.</p>
       ) : results.length > 0 ? (
         <>
-          <p className="text-xs text-white/30 uppercase tracking-widest font-semibold">Top {results.length} by views</p>
+          <p className="text-xs text-white/30 uppercase tracking-widest font-semibold">Top {results.length} by views{range ? ` · ${range === 7 ? 'this week' : range === 30 ? 'this month' : 'last 3 months'}` : ' · all time'}</p>
           {results.map((v, i) => (
             <VideoRow key={v.id} v={v} rank={i + 1}
               notes={[`Engagement ${engagementRate(v).toFixed(1)}% — ${engagementRate(v) >= 3 ? 'high, the format resonates' : 'study the title + first frame'}.`]} />

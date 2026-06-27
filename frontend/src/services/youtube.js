@@ -112,11 +112,12 @@ export async function fetchChannelVideos(uploadsPlaylistId, key, max = 15) {
 }
 
 // ── competitor search ───────────────────────────────────────────────────────
-export async function searchVideos(query, key, { shortsOnly = true, max = 15 } = {}) {
+export async function searchVideos(query, key, { shortsOnly = true, max = 15, order = 'viewCount', publishedAfter } = {}) {
   const s = await yget('search', {
     part: 'snippet', q: query, type: 'video',
-    order: 'viewCount', maxResults: String(max),
+    order, maxResults: String(max),
     videoDuration: shortsOnly ? 'short' : undefined,
+    publishedAfter,
   }, key);
   const ids = (s.items || []).map(i => i.id?.videoId).filter(Boolean);
   if (!ids.length) return [];
