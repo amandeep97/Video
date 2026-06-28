@@ -111,6 +111,17 @@ export async function fetchChannelVideos(uploadsPlaylistId, key, max = 15) {
   return (vids.items || []).map(mapVideo);
 }
 
+// ── trending (most popular) for a region ────────────────────────────────────
+export async function fetchTrending(regionCode, key, max = 20) {
+  const data = await yget('videos', {
+    part: 'snippet,statistics,contentDetails',
+    chart: 'mostPopular',
+    regionCode: regionCode || 'IN',
+    maxResults: String(max),
+  }, key);
+  return (data.items || []).map(mapVideo);
+}
+
 // ── competitor search ───────────────────────────────────────────────────────
 export async function searchVideos(query, key, { shortsOnly = true, max = 15, order = 'viewCount', publishedAfter } = {}) {
   const s = await yget('search', {

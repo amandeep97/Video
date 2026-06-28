@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { callAI } from '../services/api.js';
 import { getBackendUrl } from '../services/replicate.js';
+import { fetchTrending, getYtKey, saveYtKey } from '../services/youtube.js';
 import { HowTo } from '../components/HowTo.jsx';
 
 // ── Region config ──────────────────────────────────────────────────────────
@@ -188,10 +189,11 @@ export default function TrendIntelligence() {
   const [aiTab,      setAiTab]      = useState('trending');
 
   // YouTube optional
-  const [ytKey,      setYtKey]      = useState('');
-  const [showYtKey,  setShowYtKey]  = useState(false);
+  const [ytKey,      setYtKey]      = useState(getYtKey());
+  const [showYtKey,  setShowYtKey]  = useState(!!getYtKey());
   const [ytVideos,   setYtVideos]   = useState([]);
   const [ytLoading,  setYtLoading]  = useState(false);
+  const [ytError,    setYtError]    = useState('');
 
   // ── Fetch live feed ────────────────────────────────────────────────────
   const loadFeed = useCallback(async () => {
@@ -253,15 +255,17 @@ Return ONLY this JSON:
 
   // ── YouTube ────────────────────────────────────────────────────────────
   const fetchYT = async () => {
-    const backendUrl = getBackendUrl();
-    if (!backendUrl || !ytKey.trim()) return;
-    setYtLoading(true); setYtVideos([]);
+    if (!ytKey.trim()) return;
+    setYtLoading(true); setYtVideos([]); setYtError('');
     const geo = { India: 'IN', Pakistan: 'PK', USA: 'US', UK: 'GB', Global: 'US' }[effectiveRegion] || 'IN';
     try {
-      const r = await fetch(`${backendUrl}/api/trends/youtube?regionCode=${geo}&apiKey=${ytKey.trim()}`);
-      const d = await r.json();
-      if (d.videos) setYtVideos(d.videos);
-    } catch {}
+      saveYtKey(ytKey.trim()); // share the key with YouTube Studio
+      const vids = await fetchTrending(geo, ytKey.trim(), 20);
+      setYtVideos(vids);
+      if (!vids.length) setYtError('No trending videos returned for this region.');
+    } catch (e) {
+      setYtError(e.message);
+    }
     setYtLoading(false);
   };
 
@@ -551,6 +555,7 @@ Return ONLY this JSON:
               </button>
             </div>
           )}
+          {ytError && <p className="text-[10px] text-red-400 mb-2">{ytError}</p>}
           {ytVideos.length > 0 ? (
             <div className="space-y-2">
               {ytVideos.slice(0, 6).map((v, i) => (
