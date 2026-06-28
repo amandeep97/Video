@@ -160,18 +160,19 @@ function CompetitorSpy({ apiKey }) {
   const [q, setQ] = useState('');
   const [shortsOnly, setShortsOnly] = useState(true);
   const [range, setRange] = useState(30); // days; null = all time
+  const [lang, setLang] = useState('pa'); // pa = Punjabi, hi = Hindi, '' = any
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searched, setSearched] = useState(false);
 
-  const run = async (query, days = range) => {
+  const run = async (query, days = range, language = lang) => {
     const term = (query ?? q).trim();
     if (!term) return;
     setQ(term); setLoading(true); setError(''); setSearched(true);
     try {
       const publishedAfter = days ? new Date(Date.now() - days * 86400000).toISOString() : undefined;
-      const r = await searchVideos(term, apiKey, { shortsOnly, max: 15, publishedAfter });
+      const r = await searchVideos(term, apiKey, { shortsOnly, max: 20, publishedAfter, relevanceLanguage: language || undefined });
       setResults(r);
     } catch (e) { setError(e.message); setResults([]); }
     finally { setLoading(false); }
@@ -195,10 +196,19 @@ function CompetitorSpy({ apiKey }) {
         ))}
       </div>
       <div>
+        <p className="text-xs text-white/40 mb-1.5">Language</p>
+        <div className="flex flex-wrap gap-1.5">
+          {[{ label: 'Punjabi', v: 'pa' }, { label: 'Hindi', v: 'hi' }, { label: 'Any', v: '' }].map(l => (
+            <button key={l.label} onClick={() => { setLang(l.v); if (searched) run(undefined, range, l.v); }}
+              className={`text-xs px-3 py-1.5 rounded-full border transition-all ${lang === l.v ? 'bg-brand-500/20 border-brand-500/50 text-white' : 'bg-white/5 border-white/10 text-white/50 hover:text-white'}`}>{l.label}</button>
+          ))}
+        </div>
+      </div>
+      <div>
         <p className="text-xs text-white/40 mb-1.5">Time range — recent shows what's winning <span className="text-white/60">now</span>, not famous old songs</p>
         <div className="flex flex-wrap gap-1.5">
           {[{ label: 'This week', d: 7 }, { label: 'This month', d: 30 }, { label: 'Last 3 months', d: 90 }, { label: 'All time', d: null }].map(r => (
-            <button key={r.label} onClick={() => { setRange(r.d); if (searched) run(undefined, r.d); }}
+            <button key={r.label} onClick={() => { setRange(r.d); if (searched) run(undefined, r.d, lang); }}
               className={`text-xs px-3 py-1.5 rounded-full border transition-all ${range === r.d ? 'bg-brand-500/20 border-brand-500/50 text-white' : 'bg-white/5 border-white/10 text-white/50 hover:text-white'}`}>{r.label}</button>
           ))}
         </div>

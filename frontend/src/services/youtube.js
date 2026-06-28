@@ -123,12 +123,12 @@ export async function fetchTrending(regionCode, key, max = 20) {
 }
 
 // ── competitor search ───────────────────────────────────────────────────────
-export async function searchVideos(query, key, { shortsOnly = true, max = 15, order = 'viewCount', publishedAfter } = {}) {
+export async function searchVideos(query, key, { shortsOnly = true, max = 20, order = 'relevance', publishedAfter, relevanceLanguage, regionCode = 'IN' } = {}) {
   const s = await yget('search', {
     part: 'snippet', q: query, type: 'video',
     order, maxResults: String(max),
     videoDuration: shortsOnly ? 'short' : undefined,
-    publishedAfter,
+    publishedAfter, relevanceLanguage, regionCode,
   }, key);
   const ids = (s.items || []).map(i => i.id?.videoId).filter(Boolean);
   if (!ids.length) return [];
