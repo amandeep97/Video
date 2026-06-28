@@ -21,7 +21,7 @@ const COLORS = {
 const TABS = [
   { id: 'mine',   label: 'My Channel',     icon: Youtube },
   { id: 'spy',    label: 'Competitor Spy', icon: Search },
-  { id: 'titles', label: 'Title Maker',    icon: Sparkles },
+  { id: 'titles', label: 'YT Package',     icon: Sparkles },
 ];
 
 function num(n) { return (n || 0).toLocaleString(); }
@@ -243,41 +243,51 @@ function TitleMaker() {
   const [topic, setTopic] = useState('');
   const [mood, setMood] = useState('Sad');
   const [lang, setLang] = useState('Hinglish');
-  const [titles, setTitles] = useState([]);
+  const [pkg, setPkg] = useState(null); // { titles[], description, hashtags[] }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const gen = async () => {
     if (!hasValidKey()) { setError('Set your AI API key first (⚙ on the Home page).'); return; }
-    setLoading(true); setError(''); setTitles([]);
+    setLoading(true); setError(''); setPkg(null);
     try {
       const out = await callAI(
-        `You write YouTube Shorts titles for a Punjabi/Hindi status-video channel. The titles that get tens of millions of views use a keyword-stuffed format with "||" separators, packing in the exact phrases people search to download status clips. Real winning examples right now:
+        `You write the complete YouTube Shorts publishing package for a Punjabi/Hindi status-video channel. Titles use a keyword-stuffed "||" format anchored on the phrases people search to find downloadable status clips. Real winning examples right now:
 - "Chunari Chunari || Dance || a beautiful transition WhatsApp Status"
 - "Bairan Hindi || new song || WhatsApp Lyrics || Love Status"
-The magic search keywords are: WhatsApp Status, WhatsApp Lyrics, Love Status, Sad Status, Status Video. People type these to find downloadable status reels.`,
-        `Write 8 YouTube Shorts titles in the proven winning format.
+The magic search keywords are: WhatsApp Status, WhatsApp Lyrics, Love Status, Sad Status, Status Video.
+Respond with valid JSON only — no markdown, no code fences, no extra text.`,
+        `Create a YouTube Shorts publishing package.
 Mood: ${mood}
 Language for the title: ${lang}
 ${topic ? `About / song: ${topic}` : ''}
-Rules:
-- Use the "||" separator format: Song or hook || descriptor || searchable status keyword
-- EVERY title must include at least one of: WhatsApp Status, WhatsApp Lyrics, Love Status, Sad Status
-- Keep the emotional hook strong but pack in searchable keywords
-- One emoji max per title, under 80 chars
-- Mix: some lead with the song name, some lead with the emotional hook
-Return ONLY the 8 titles, one per line, no numbering, no quotes.`,
-        600,
+
+Return ONLY this JSON:
+{
+  "titles": ["4 title options in the || format. Each MUST include a searchable status keyword and END with #Shorts. One emoji max. Under 90 chars."],
+  "description": "A 2-3 line YouTube description: emotional + searchable phrases people type to find status videos. Natural, not spammy.",
+  "hashtags": ["6 to 8 relevant hashtags as strings starting with #. Always include #Shorts and #whatsappstatus. Keep them lowercase and niche-relevant."]
+}`,
+        900,
       );
-      const lines = out.split('\n').map(l => l.replace(/^[\d.\-)\s"']+/, '').trim()).filter(Boolean).slice(0, 8);
-      setTitles(lines);
+      const m = out.match(/\{[\s\S]*\}/);
+      if (!m) throw new Error('AI returned an unexpected format. Try again.');
+      const data = JSON.parse(m[0]);
+      setPkg({
+        titles: (data.titles || []).slice(0, 4),
+        description: data.description || '',
+        hashtags: (data.hashtags || []).map(h => h.startsWith('#') ? h : `#${h}`),
+      });
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   };
 
+  const hashtagLine = pkg ? pkg.hashtags.join(' ') : '';
+  const fullDescription = pkg ? `${pkg.description}\n\n${hashtagLine}` : '';
+
   return (
     <div className="space-y-3">
-      <p className="text-sm text-white/50">YouTube is search-driven. These titles help the same video you post to Instagram get found on YouTube.</p>
+      <p className="text-sm text-white/50">One tap → the full YouTube package: titles, description, and hashtags, ready to paste.</p>
       <input value={topic} onChange={e => setTopic(e.target.value)}
         placeholder="Optional: what's the video about? (e.g. waiting for a reply)"
         className="input-field text-sm" />
@@ -303,16 +313,52 @@ Return ONLY the 8 titles, one per line, no numbering, no quotes.`,
       <button onClick={gen} disabled={loading}
         className="btn-primary w-full py-3 flex items-center justify-center gap-2">
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-        {loading ? 'Writing…' : 'Generate titles'}
+        {loading ? 'Writing…' : 'Generate full package'}
       </button>
-      {titles.length > 0 && (
-        <div className="space-y-2">
-          {titles.map((t, i) => (
-            <div key={i} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2.5">
-              <span className="flex-1 text-sm text-white/80">{t}</span>
-              <CopyBtn text={t} />
+
+      {pkg && (
+        <div className="space-y-4 pt-1">
+          {/* Titles */}
+          <div>
+            <p className="text-xs text-white/30 uppercase tracking-widest font-semibold mb-2">Title — pick one</p>
+            <div className="space-y-2">
+              {pkg.titles.map((t, i) => (
+                <div key={i} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2.5">
+                  <span className="flex-1 text-sm text-white/80">{t}</span>
+                  <CopyBtn text={t} />
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+
+          {/* Description (with hashtags) */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-white/30 uppercase tracking-widest font-semibold">Description — paste as-is</p>
+              <CopyBtn text={fullDescription} />
+            </div>
+            <div className="rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-white/70 whitespace-pre-wrap leading-relaxed">
+              {fullDescription}
+            </div>
+          </div>
+
+          {/* Hashtags only */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs text-white/30 uppercase tracking-widest font-semibold">Hashtags only</p>
+              <CopyBtn text={hashtagLine} />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {pkg.hashtags.map((h, i) => (
+                <span key={i} className="text-xs px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-white/60">{h}</span>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex gap-2 text-xs text-white/40 bg-white/5 border border-white/10 rounded-xl p-3">
+            <span>💡</span>
+            <span>Put <b className="text-white/60">#Shorts</b> in the title so YouTube pushes it in the Shorts feed. Paste the description (hashtags already at the bottom) into the description box when you upload.</span>
+          </div>
         </div>
       )}
     </div>
