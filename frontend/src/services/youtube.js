@@ -136,6 +136,62 @@ export async function searchVideos(query, key, { shortsOnly = true, max = 20, or
   return (vids.items || []).map(mapVideo).sort((a, b) => b.views - a.views);
 }
 
+// ── trend detection ──────────────────────────────────────────────────────────
+// The strongest "make this now" signal: the SAME song remade by MULTIPLE
+// creators, all pulling views this week. We cluster search results by a
+// normalized song signature extracted from titles, then rank clusters.
+
+const NOISE_WORDS = new Set([
+  'new', 'song', 'video', 'whatsapp', 'status', 'lyrics', 'lyric', 'lyrical',
+  'love', 'sad', 'short', 'shorts', 'punjabi', 'hindi', 'full', 'official',
+  'trending', 'viral', 'reels', 'reel', 'best', 'latest', 'ft', 'feat', 'the',
+]);
+
+function songSignature(title) {
+  // Take the part before the first "||" or "|" — that's usually the song name.
+  const head = (title || '').split(/\|\|?|•|—|–/)[0];
+  const tokens = head
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')      // strip emoji/punctuation, keep Gurmukhi/Devanagari
+    .split(/\s+/)
+    .filter(t => t.length > 1 && !NOISE_WORDS.has(t));
+  return tokens.slice(0, 3).join(' ');
+}
+
+export async function detectTrends(key, queries, { days = 7, relevanceLanguage = 'pa' } = {}) {
+  const publishedAfter = new Date(Date.now() - days * 86400000).toISOString();
+  const batches = await Promise.all(
+    queries.map(q =>
+      searchVideos(q, key, { shortsOnly: true, max: 20, publishedAfter, relevanceLanguage })
+        .catch(() => [])
+    )
+  );
+  const seen = new Map(); // videoId → video (dedupe across queries)
+  batches.flat().forEach(v => { if (v.id && !seen.has(v.id)) seen.set(v.id, v); });
+
+  const clusters = new Map(); // signature → { videos, channels }
+  for (const v of seen.values()) {
+    const sig = songSignature(v.title);
+    if (!sig) continue;
+    if (!clusters.has(sig)) clusters.set(sig, { sig, videos: [], channels: new Set() });
+    const c = clusters.get(sig);
+    c.videos.push(v);
+    c.channels.add(v.channelId || v.channel);
+  }
+
+  return [...clusters.values()]
+    .map(c => ({
+      song: c.videos[0].title.split(/\|\|?|•|—|–/)[0].trim(), // display name from the top video
+      signature: c.sig,
+      creators: c.channels.size,
+      totalViews: c.videos.reduce((s, v) => s + v.views, 0),
+      videos: c.videos.sort((a, b) => b.views - a.views).slice(0, 4),
+    }))
+    .filter(c => c.creators >= 2)                      // the multi-creator signal
+    .sort((a, b) => b.creators - a.creators || b.totalViews - a.totalViews)
+    .slice(0, 5);
+}
+
 // ── verdict (public-data heuristic) ─────────────────────────────────────────
 export function engagementRate(v) {
   return v.views ? ((v.likes + v.comments) / v.views) * 100 : 0;

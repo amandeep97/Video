@@ -10,6 +10,7 @@ import ChannelLauncher from './pages/ChannelLauncher.jsx';
 import GrowthTools from './pages/GrowthTools.jsx';
 import InstaInsights from './pages/InstaInsights.jsx';
 import YouTubeStudio from './pages/YouTubeStudio.jsx';
+import Producer from './pages/Producer.jsx';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
       <Route path="/tools" element={<GrowthTools />} />
       <Route path="/insights" element={<InstaInsights />} />
       <Route path="/youtube" element={<YouTubeStudio />} />
+      <Route path="/producer" element={<Producer />} />
     </Routes>
   );
 }
