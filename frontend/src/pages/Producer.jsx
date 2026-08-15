@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Radar, Loader2, Sparkles, ExternalLink, AlertCircle,
-  Copy, Check, RefreshCw, Flame, Eye, Users, ChevronLeft, Youtube,
+  RefreshCw, Flame, Eye, Users, ChevronLeft, Youtube, Library as LibraryIcon,
+  BookmarkPlus, Check, Layers,
 } from 'lucide-react';
 import { getYtKey, detectTrends, searchVideos } from '../services/youtube.js';
-import { callAI, hasValidKey } from '../services/api.js';
+import { generateKit, generateBatch, saveKit, getStats } from '../services/kits.js';
+import { hasValidKey } from '../services/api.js';
+import KitDetail from '../components/KitDetail.jsx';
 
 const SCAN_QUERIES = [
   'punjabi sad song status',
@@ -21,30 +24,8 @@ function num(n) {
   return String(n || 0);
 }
 
-function CopyLine({ text }) {
-  const [c, setC] = useState(false);
-  return (
-    <button onClick={() => { navigator.clipboard.writeText(text); setC(true); setTimeout(() => setC(false), 1500); }}
-      className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all ${c ? 'bg-green-500/20 text-green-400' : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white'}`}>
-      {c ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-    </button>
-  );
-}
-
-function Section({ title, copyAll, children }) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-xs text-white/30 uppercase tracking-widest font-semibold">{title}</p>
-        {copyAll && <CopyLine text={copyAll} />}
-      </div>
-      {children}
-    </div>
-  );
-}
-
 // ── Trend card ───────────────────────────────────────────────────────────────
-function TrendCard({ trend, rank, onMake }) {
+function TrendCard({ trend, rank, onMake, onBatch }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
       <div className="flex items-start gap-3">
@@ -69,56 +50,40 @@ function TrendCard({ trend, rank, onMake }) {
           </a>
         ))}
       </div>
-      <button onClick={() => onMake(trend)}
-        className="btn-primary w-full py-2.5 text-sm flex items-center justify-center gap-2">
-        <Sparkles className="w-4 h-4" /> Make this — full kit
-      </button>
+      <div className="flex gap-2">
+        <button onClick={() => onMake(trend)}
+          className="btn-primary flex-1 py-2.5 text-sm flex items-center justify-center gap-2">
+          <Sparkles className="w-4 h-4" /> Make one
+        </button>
+        <button onClick={() => onBatch(trend)}
+          className="px-3 py-2.5 rounded-2xl text-sm font-semibold bg-violet-500/15 border border-violet-500/30 text-violet-300 hover:bg-violet-500/25 transition-all flex items-center gap-1.5"
+          title="Generate a week of kits from this song">
+          <Layers className="w-4 h-4" /> Week
+        </button>
+      </div>
     </div>
   );
 }
 
 // ── Kit view ─────────────────────────────────────────────────────────────────
 function KitView({ trend, onBack }) {
+  const navigate = useNavigate();
   const [kit, setKit] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [saved, setSaved] = useState(false);
 
   const gen = async () => {
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setSaved(false);
     try {
-      const sample = trend.videos.map(v => v.title).join(' | ');
-      const out = await callAI(
-        `You write viral Punjabi song-status video kits. You specialise in micro-moment specificity — the tiny exact behaviours that make someone stop scrolling and think "this is literally me." You know "ਤੇਰੀ ਯਾਦ" gets ignored but "'ਕਿਵੇਂ ਹੋ?' — 14 ਵਾਰ type ਕੀਤਾ, 14 ਵਾਰ delete" gets screenshotted and shared. BANNED phrases: ਤੇਰੀ ਯਾਦ, dil toot gaya, missing you, yaad aa raha, ਦਿਲ ਟੁੱਟਿਆ, broken heart, tenu bhulna.
-Respond with valid JSON only — no markdown, no code fences.`,
-        `A song is trending on YouTube Shorts RIGHT NOW: ${trend.creators} different creators remade it this week for ${trend.totalViews.toLocaleString()} combined views.
-Song (from the top video title): "${trend.song}"
-Sample titles of the winning versions: ${sample}
-
-Create my own version's complete kit. Return ONLY this JSON:
-{
-  "mood": "one word — the emotional lane of this song (sad/love/funny/attitude/devotional)",
-  "angle": "one sentence: the specific emotional angle my version should take to stand out from the ${trend.creators} existing versions",
-  "overlays": [
-    {"pa": "on-screen line in Gurmukhi (mixing English words like type/delete/last seen is good)", "translit": "roman transliteration"}
-  ],
-  "footage": ["4 varied Pexels search terms, 3-5 words each, matching the mood — NO rain on window"],
-  "firstFrame": "exactly what the first 1 second must show to stop the scroll",
-  "ytTitles": ["3 title options: Song || descriptor || WhatsApp Status keyword, ending #Shorts, under 90 chars"],
-  "description": "2-3 line YouTube description with searchable status phrases",
-  "hashtags": ["7 hashtags starting with #, include #Shorts and #whatsappstatus"],
-  "igCaption": "short emotional Instagram caption in Punjabi + 8-10 hashtags on a new line"
-}
-Give exactly 6 overlays. They must tell one story in sequence, and the last one must loop back to the first.`,
-        2000,
-      );
-      const m = out.match(/\{[\s\S]*\}/);
-      if (!m) throw new Error('AI returned an unexpected format — tap retry.');
-      setKit(JSON.parse(m[0]));
+      setKit(await generateKit(trend));
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   };
 
   useEffect(() => { gen(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  const save = () => { saveKit({ trend, kit }); setSaved(true); };
 
   if (loading) {
     return (
@@ -137,10 +102,6 @@ Give exactly 6 overlays. They must tell one story in sequence, and the last one 
     );
   }
 
-  const overlayAll = (kit.overlays || []).map(o => o.pa).join('\n');
-  const hashtagLine = (kit.hashtags || []).join(' ');
-  const fullDesc = `${kit.description || ''}\n\n${hashtagLine}`;
-
   return (
     <div className="space-y-5">
       <button onClick={onBack} className="flex items-center gap-1 text-xs text-white/40 hover:text-white transition-all">
@@ -153,58 +114,84 @@ Give exactly 6 overlays. They must tell one story in sequence, and the last one 
         <p className="text-xs text-white/50 mt-1">{trend.creators} creators · {num(trend.totalViews)} views this week · your angle: <span className="text-white/80">{kit.angle}</span></p>
       </div>
 
-      <Section title="First frame (stops the scroll)">
-        <div className="rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-white/70 leading-relaxed">{kit.firstFrame}</div>
-      </Section>
+      <div className="flex gap-2">
+        <button onClick={save} disabled={saved}
+          className={`flex-1 py-2.5 rounded-2xl text-sm font-semibold flex items-center justify-center gap-2 transition-all ${saved ? 'bg-green-500/15 border border-green-500/30 text-green-300' : 'btn-primary'}`}>
+          {saved ? <><Check className="w-4 h-4" /> Saved to My Content</> : <><BookmarkPlus className="w-4 h-4" /> Save this kit</>}
+        </button>
+        {saved && (
+          <button onClick={() => navigate('/library')}
+            className="px-4 py-2.5 rounded-2xl text-sm font-semibold bg-white/5 border border-white/10 text-white/60 hover:text-white transition-all">
+            Open
+          </button>
+        )}
+      </div>
 
-      <Section title="On-screen lines — one per clip, in order" copyAll={overlayAll}>
-        <div className="space-y-2">
-          {(kit.overlays || []).map((o, i) => (
-            <div key={i} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2.5">
-              <span className="w-5 h-5 rounded-full bg-white/10 text-white/40 text-[10px] font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-white/90 leading-snug">{o.pa}</p>
-                {o.translit && <p className="text-[10px] text-white/30 mt-0.5">{o.translit}</p>}
-              </div>
-              <CopyLine text={o.pa} />
-            </div>
-          ))}
+      <KitDetail kit={kit} />
+    </div>
+  );
+}
+
+// ── Batch view ───────────────────────────────────────────────────────────────
+function BatchView({ trend, onBack }) {
+  const navigate = useNavigate();
+  const COUNT = 5;
+  const [done, setDone] = useState(0);
+  const [made, setMade] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const recs = await generateBatch(trend, COUNT, (n) => { if (alive) setDone(n); });
+        if (alive) setMade(recs);
+      } catch (e) { if (alive) setError(e.message); }
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (error) {
+    return (
+      <div className="space-y-3 py-8 text-center">
+        <p className="text-xs text-red-400 flex items-center justify-center gap-1.5"><AlertCircle className="w-4 h-4" />{error}</p>
+        <button onClick={onBack} className="btn-primary px-6 py-2.5 text-sm">Back</button>
+      </div>
+    );
+  }
+
+  if (!made) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 py-16">
+        <Loader2 className="w-7 h-7 animate-spin text-violet-400" />
+        <div className="text-center">
+          <p className="text-sm text-white/70 font-semibold">Writing {COUNT} different kits…</p>
+          <p className="text-xs text-white/40 mt-1">{done} of {COUNT} done — each one takes a different emotional angle.</p>
         </div>
-      </Section>
-
-      <Section title="Footage — search these on Pexels/Pixabay" copyAll={(kit.footage || []).join('\n')}>
-        <div className="space-y-1.5">
-          {(kit.footage || []).map((f, i) => (
-            <div key={i} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2.5">
-              <span className="flex-1 text-sm text-white/70">{f}</span>
-              <CopyLine text={f} />
-            </div>
-          ))}
+        <div className="w-48 h-1.5 rounded-full bg-white/10 overflow-hidden">
+          <div className="h-full bg-violet-500 transition-all duration-500" style={{ width: `${(done / COUNT) * 100}%` }} />
         </div>
-      </Section>
+      </div>
+    );
+  }
 
-      <Section title="YouTube title — pick one">
-        <div className="space-y-2">
-          {(kit.ytTitles || []).map((t, i) => (
-            <div key={i} className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2.5">
-              <span className="flex-1 text-sm text-white/80">{t}</span>
-              <CopyLine text={t} />
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      <Section title="YouTube description — paste as-is" copyAll={fullDesc}>
-        <div className="rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-white/70 whitespace-pre-wrap leading-relaxed">{fullDesc}</div>
-      </Section>
-
-      <Section title="Instagram caption" copyAll={kit.igCaption}>
-        <div className="rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-white/70 whitespace-pre-wrap leading-relaxed">{kit.igCaption}</div>
-      </Section>
-
-      <div className="flex gap-2 text-xs text-white/40 bg-white/5 border border-white/10 rounded-xl p-3">
-        <span>🎬</span>
-        <span>Build: CapCut → 4 clips → one line per clip → transition on the beat → export. Add the song <b className="text-white/60">inside Instagram/YouTube</b> when posting.</span>
+  return (
+    <div className="space-y-4 py-6 text-center">
+      <div className="w-14 h-14 rounded-2xl bg-green-500/15 border border-green-500/30 flex items-center justify-center mx-auto">
+        <Check className="w-7 h-7 text-green-400" />
+      </div>
+      <div>
+        <p className="text-lg font-black text-white">{made.length} kits saved</p>
+        <p className="text-sm text-white/40 mt-1">That's your week of content — all in My Content, ready to make one at a time.</p>
+      </div>
+      <div className="flex gap-2 justify-center">
+        <button onClick={() => navigate('/library')} className="btn-primary px-6 py-2.5 text-sm inline-flex items-center gap-2">
+          <LibraryIcon className="w-4 h-4" /> Open My Content
+        </button>
+        <button onClick={onBack} className="px-5 py-2.5 rounded-2xl text-sm font-semibold bg-white/5 border border-white/10 text-white/60 hover:text-white transition-all">
+          Back
+        </button>
       </div>
     </div>
   );
@@ -218,8 +205,9 @@ export default function Producer() {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState('');
   const [scanned, setScanned] = useState(false);
-  const [active, setActive] = useState(null); // trend being made
+  const [active, setActive] = useState(null);   // { trend, mode: 'one' | 'week' }
   const ytKey = getYtKey();
+  const stats = getStats();
 
   const scan = async () => {
     setScanning(true); setError(''); setTrends([]); setFallback([]);
@@ -227,8 +215,6 @@ export default function Producer() {
       const found = await detectTrends(ytKey, SCAN_QUERIES, { days: 7, relevanceLanguage: 'pa' });
       setTrends(found);
       if (!found.length) {
-        // No multi-creator cluster this week — fall back to the top videos so
-        // there is always something to make.
         const publishedAfter = new Date(Date.now() - 7 * 86400000).toISOString();
         const top = await searchVideos('punjabi sad song status', ytKey, { shortsOnly: true, max: 8, publishedAfter, relevanceLanguage: 'pa' });
         setFallback(top.sort((a, b) => b.views - a.views).slice(0, 5));
@@ -242,7 +228,7 @@ export default function Producer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const makeFromVideo = (v) => setActive({
+  const asTrend = (v) => ({
     song: v.title.split(/\|\|?|•|—|–/)[0].trim(),
     creators: 1,
     totalViews: v.views,
@@ -262,6 +248,15 @@ export default function Producer() {
             </div>
             <span className="font-black text-white">AI Producer</span>
           </div>
+          <button onClick={() => navigate('/library')} title="My Content"
+            className="relative w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all">
+            <LibraryIcon className="w-4 h-4" />
+            {stats.todo > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-violet-500 text-[10px] font-bold text-white flex items-center justify-center">
+                {stats.todo}
+              </span>
+            )}
+          </button>
           {ytKey && !active && (
             <button onClick={scan} disabled={scanning} title="Rescan"
               className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all">
@@ -279,14 +274,28 @@ export default function Producer() {
             <p className="text-sm text-white/70">The Producer scans YouTube to find songs blowing up this week. Add your free YouTube API key first.</p>
             <button onClick={() => navigate('/youtube')} className="btn-primary px-6 py-2.5 text-sm">Set up in YouTube Studio</button>
           </div>
+        ) : active?.mode === 'week' ? (
+          <BatchView trend={active.trend} onBack={() => setActive(null)} />
         ) : active ? (
-          <KitView trend={active} onBack={() => setActive(null)} />
+          <KitView trend={active.trend} onBack={() => setActive(null)} />
         ) : (
           <>
             <div>
               <h1 className="text-2xl font-black text-white mb-1">What to make today</h1>
               <p className="text-sm text-white/40">Scans this week's Punjabi status reels and finds songs <b className="text-white/60">multiple creators</b> are remaking — proven waves you can still ride.</p>
             </div>
+
+            {stats.todo > 0 && (
+              <button onClick={() => navigate('/library')}
+                className="w-full rounded-2xl border border-violet-500/25 bg-violet-500/10 p-3 flex items-center gap-3 hover:bg-violet-500/15 transition-all text-left">
+                <LibraryIcon className="w-5 h-5 text-violet-300 flex-shrink-0" />
+                <span className="flex-1 text-sm text-white/80">
+                  You have <b className="text-white">{stats.todo}</b> {stats.todo === 1 ? 'kit' : 'kits'} waiting to be made
+                  {stats.streak > 0 && <span className="text-white/50"> · {stats.streak} day streak</span>}
+                </span>
+                <ChevronLeft className="w-4 h-4 text-white/30 rotate-180" />
+              </button>
+            )}
 
             {!hasValidKey() && (
               <p className="text-xs text-amber-300/80 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
@@ -303,7 +312,11 @@ export default function Producer() {
             ) : trends.length > 0 ? (
               <>
                 <p className="text-xs text-white/30 uppercase tracking-widest font-semibold">🔥 Live trends · this week</p>
-                {trends.map((t, i) => <TrendCard key={t.signature} trend={t} rank={i + 1} onMake={setActive} />)}
+                {trends.map((t, i) => (
+                  <TrendCard key={t.signature} trend={t} rank={i + 1}
+                    onMake={tr => setActive({ trend: tr, mode: 'one' })}
+                    onBatch={tr => setActive({ trend: tr, mode: 'week' })} />
+                ))}
               </>
             ) : scanned ? (
               <>
@@ -314,12 +327,18 @@ export default function Producer() {
                       <p className="flex-1 text-sm text-white/80 leading-snug">{v.title}</p>
                       <a href={v.url} target="_blank" rel="noreferrer" className="text-white/30 hover:text-white flex-shrink-0"><ExternalLink className="w-3.5 h-3.5" /></a>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-white/40">{num(v.views)} views · {v.channel}</span>
-                      <button onClick={() => makeFromVideo(v)}
-                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-500/20 border border-brand-500/30 text-brand-300 hover:bg-brand-500/30 transition-all">
-                        <Sparkles className="w-3 h-3 inline mr-1" />Make this
-                      </button>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs text-white/40 truncate">{num(v.views)} views · {v.channel}</span>
+                      <div className="flex gap-1.5 flex-shrink-0">
+                        <button onClick={() => setActive({ trend: asTrend(v), mode: 'one' })}
+                          className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-brand-500/20 border border-brand-500/30 text-brand-300 hover:bg-brand-500/30 transition-all">
+                          <Sparkles className="w-3 h-3 inline mr-1" />Make
+                        </button>
+                        <button onClick={() => setActive({ trend: asTrend(v), mode: 'week' })}
+                          className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-violet-500/15 border border-violet-500/30 text-violet-300 hover:bg-violet-500/25 transition-all">
+                          <Layers className="w-3 h-3 inline mr-1" />Week
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

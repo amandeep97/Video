@@ -4,12 +4,14 @@ import {
   Video, Sparkles, Zap, Globe, Mic, Layers, ChevronRight,
   Play, Key, TrendingUp, MapPin, Scissors, FlaskConical,
   TestTube2, Rocket, Menu, X, ArrowRight, Instagram, Youtube, Radar,
+  Library as LibraryIcon,
 } from 'lucide-react';
 import ApiKeyModal from '../components/ApiKeyModal.jsx';
 import { hasValidKey, getSettings, PROVIDERS } from '../services/providers.js';
 
 const TOOLS = [
   { icon: Radar,        label: 'AI Producer',      desc: 'What to make today',       route: '/producer',  grad: 'from-orange-500 to-pink-600',  ring: 'border-orange-500/30 bg-orange-500/10 text-orange-300' },
+  { icon: LibraryIcon,  label: 'My Content',       desc: 'Saved kits & streak',      route: '/library',   grad: 'from-violet-500 to-purple-600',ring: 'border-violet-500/30 bg-violet-500/10 text-violet-300' },
   { icon: Zap,          label: 'Growth Tools',    desc: 'Hooks & Shorts scripts',   route: '/tools',     grad: 'from-cyan-400 to-blue-500',    ring: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300' },
   { icon: Instagram,    label: 'Reel Insights',    desc: 'Analyze your reels',       route: '/insights',  grad: 'from-pink-500 to-orange-500',  ring: 'border-pink-500/30 bg-pink-500/10 text-pink-300' },
   { icon: Youtube,      label: 'YouTube Studio',   desc: 'Spy + analyze + titles',   route: '/youtube',   grad: 'from-red-500 to-red-600',      ring: 'border-red-500/30 bg-red-500/10 text-red-300' },

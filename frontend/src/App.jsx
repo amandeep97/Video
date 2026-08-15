@@ -11,6 +11,7 @@ import GrowthTools from './pages/GrowthTools.jsx';
 import InstaInsights from './pages/InstaInsights.jsx';
 import YouTubeStudio from './pages/YouTubeStudio.jsx';
 import Producer from './pages/Producer.jsx';
+import Library from './pages/Library.jsx';
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
       <Route path="/insights" element={<InstaInsights />} />
       <Route path="/youtube" element={<YouTubeStudio />} />
       <Route path="/producer" element={<Producer />} />
+      <Route path="/library" element={<Library />} />
     </Routes>
   );
 }
