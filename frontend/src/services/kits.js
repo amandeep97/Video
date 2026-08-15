@@ -55,6 +55,62 @@ export function deleteKit(id) {
   return write(read().filter(k => k.id !== id));
 }
 
+// ── results logging ─────────────────────────────────────────────────────────
+export function logResults(id, { views, saves }) {
+  return updateKit(id, {
+    results: {
+      views: Number(views) || 0,
+      saves: Number(saves) || 0,
+      loggedAt: Date.now(),
+    },
+  });
+}
+
+// What is actually working for THIS creator — grouped by the kit's mood.
+// Needs a few logged posts before it says anything, so it doesn't draw
+// confident conclusions from one lucky reel.
+export function getInsights() {
+  const logged = read().filter(k => k.results?.loggedAt && k.results.views > 0);
+  if (logged.length < 3) {
+    return { ready: false, need: 3 - logged.length, logged: logged.length };
+  }
+
+  const byMood = new Map();
+  for (const k of logged) {
+    const mood = (k.kit?.mood || 'unknown').toLowerCase();
+    if (!byMood.has(mood)) byMood.set(mood, []);
+    byMood.get(mood).push(k);
+  }
+
+  const groups = [...byMood.entries()]
+    .map(([mood, items]) => ({
+      mood,
+      count: items.length,
+      avgViews: Math.round(items.reduce((s, k) => s + k.results.views, 0) / items.length),
+      avgSaves: Math.round(items.reduce((s, k) => s + k.results.saves, 0) / items.length),
+    }))
+    .sort((a, b) => b.avgViews - a.avgViews);
+
+  const allViews = logged.map(k => k.results.views).sort((a, b) => a - b);
+  const mid = Math.floor(allViews.length / 2);
+  const medianViews = allViews.length % 2 ? allViews[mid] : Math.round((allViews[mid - 1] + allViews[mid]) / 2);
+
+  const best = [...logged].sort((a, b) => b.results.views - a.results.views)[0];
+
+  return {
+    ready: true,
+    logged: logged.length,
+    groups,
+    medianViews,
+    best,
+    // Only call a mood a winner when there is more than one to compare and
+    // the gap is real, not noise.
+    verdict: groups.length > 1 && groups[0].avgViews >= groups[groups.length - 1].avgViews * 1.5
+      ? { mood: groups[0].mood, weakest: groups[groups.length - 1].mood }
+      : null,
+  };
+}
+
 // ── streak ──────────────────────────────────────────────────────────────────
 function dayKey(ts) {
   const d = new Date(ts);

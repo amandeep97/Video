@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Library as LibraryIcon, Flame, Trash2, ChevronDown, ChevronUp,
-  Scissors, Send, CheckCircle2, Radar, Circle,
+  Scissors, Send, CheckCircle2, Radar, Circle, BarChart3, TrendingUp,
 } from 'lucide-react';
 import KitDetail from '../components/KitDetail.jsx';
-import { getKits, setStatus, deleteKit, getStats, STATUS } from '../services/kits.js';
+import { getKits, setStatus, deleteKit, getStats, logResults, getInsights, STATUS } from '../services/kits.js';
 
 const FILTERS = [
   { id: 'todo',   label: 'To make', icon: Circle },
@@ -28,8 +28,30 @@ function when(ts) {
   return `${days} days ago`;
 }
 
+function ResultsForm({ rec, onDone }) {
+  const [views, setViews] = useState(rec.results?.views || '');
+  const [saves, setSaves] = useState(rec.results?.saves || '');
+
+  const submit = () => { logResults(rec.id, { views, saves }); onDone(); };
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2">
+      <p className="text-xs text-white/50">Open the reel's insights and type the numbers in — the app learns which moods work for you.</p>
+      <div className="flex gap-2">
+        <input type="number" inputMode="numeric" value={views} onChange={e => setViews(e.target.value)}
+          placeholder="Views" className="input-field text-sm flex-1" />
+        <input type="number" inputMode="numeric" value={saves} onChange={e => setSaves(e.target.value)}
+          placeholder="Saves" className="input-field text-sm flex-1" />
+        <button onClick={submit} disabled={!views}
+          className="btn-primary px-4 text-sm disabled:opacity-40">Save</button>
+      </div>
+    </div>
+  );
+}
+
 function KitCard({ rec, onChange }) {
   const [open, setOpen] = useState(false);
+  const [logging, setLogging] = useState(false);
 
   const move = (status) => { setStatus(rec.id, status); onChange(); };
   const remove = () => { deleteKit(rec.id); onChange(); };
@@ -66,9 +88,10 @@ function KitCard({ rec, onChange }) {
             </button>
           )}
           {rec.status === STATUS.POSTED && (
-            <button onClick={() => move(STATUS.TODO)}
-              className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white/40 hover:text-white transition-all">
-              Undo
+            <button onClick={() => setLogging(l => !l)}
+              className={`text-xs font-semibold px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 ${rec.results ? 'bg-white/5 border-white/10 text-white/50 hover:text-white' : 'bg-amber-500/15 border-amber-500/30 text-amber-300 hover:bg-amber-500/25'}`}>
+              <BarChart3 className="w-3.5 h-3.5" />
+              {rec.results ? `${rec.results.views.toLocaleString()} views` : 'Log results'}
             </button>
           )}
           <button onClick={() => setOpen(o => !o)}
@@ -82,6 +105,12 @@ function KitCard({ rec, onChange }) {
           </button>
         </div>
       </div>
+
+      {logging && (
+        <div className="px-3 pb-3">
+          <ResultsForm rec={rec} onDone={() => { setLogging(false); onChange(); }} />
+        </div>
+      )}
 
       {open && (
         <div className="border-t border-white/5 p-3">
@@ -100,6 +129,7 @@ export default function Library() {
 
   const kits = getKits();
   const stats = getStats();
+  const insights = getInsights();
   const shown = filter === 'all' ? kits : kits.filter(k => k.status === filter);
 
   return (
@@ -156,6 +186,52 @@ export default function Library() {
             ))}
           </div>
         </div>
+
+        {/* What's working for you */}
+        {insights.ready ? (
+          <div className="rounded-2xl border border-green-500/20 bg-green-500/5 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-green-400" />
+              <p className="text-xs font-bold text-green-300 uppercase tracking-widest">What's working for you</p>
+            </div>
+            {insights.verdict ? (
+              <p className="text-sm text-white/80 leading-snug">
+                Your <b className="text-white">{insights.verdict.mood}</b> reels do best — make more of those.
+                Your <b className="text-white/60">{insights.verdict.weakest}</b> ones underperform.
+              </p>
+            ) : (
+              <p className="text-sm text-white/70 leading-snug">
+                No clear winner yet — your moods are performing about the same. Keep logging results.
+              </p>
+            )}
+            <div className="space-y-1.5">
+              {insights.groups.map(g => {
+                const top = insights.groups[0].avgViews || 1;
+                return (
+                  <div key={g.mood} className="flex items-center gap-2">
+                    <span className="text-xs text-white/60 w-20 flex-shrink-0 truncate capitalize">{g.mood}</span>
+                    <div className="flex-1 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                      <div className="h-full bg-green-500/70 rounded-full" style={{ width: `${Math.max(4, (g.avgViews / top) * 100)}%` }} />
+                    </div>
+                    <span className="text-xs text-white/50 w-24 text-right flex-shrink-0">
+                      {g.avgViews.toLocaleString()} avg
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-white/30">
+              From {insights.logged} logged posts · median {insights.medianViews.toLocaleString()} views · best: {insights.best.song}
+            </p>
+          </div>
+        ) : stats.posted > 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-3 flex gap-2 items-start">
+            <BarChart3 className="w-4 h-4 text-amber-300 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-white/50 leading-snug">
+              Tap <b className="text-white/70">Log results</b> on your posted reels. After {insights.need} more, the app will tell you which moods actually work for you.
+            </p>
+          </div>
+        ) : null}
 
         {/* Filters */}
         <div className="flex gap-1.5">
